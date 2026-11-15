@@ -1,0 +1,1260 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>ケア排尿ノート - 排尿記録・予測アプリ</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Noto Sans JP & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Noto Sans JP"', '"Inter"', 'sans-serif'],
+            num: ['"Inter"', '"Noto Sans JP"', 'sans-serif'],
+          },
+          colors: {
+            teal: {
+              50: '#f0fdfa',
+              100: '#ccfbf1',
+              200: '#99f6e4',
+              500: '#14b8a6',
+              600: '#0d9488',
+              700: '#0f766e',
+              800: '#115e59',
+              900: '#134e4a',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* カスタムスクロールバーとモバイルアプリ風の質感調整 */
+    body {
+      background-color: #e2e8f0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .app-container {
+      max-width: 480px;
+      min-height: 100vh;
+      margin: 0 auto;
+      background-color: #f8fafc;
+      box-shadow: 0 10px 30px -5px rgba(15, 23, 42, 0.12);
+    }
+    /* ボタンの押し心地アニメーション */
+    .tap-btn {
+      transition: transform 0.1s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .tap-btn:active {
+      transform: scale(0.97);
+    }
+    /* トースト通知アニメーション */
+    @keyframes slideUp {
+      from { transform: translate(-50%, 20px); opacity: 0; }
+      to { transform: translate(-50%, 0); opacity: 1; }
+    }
+    .toast-enter {
+      animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+  </style>
+</head>
+<body class="font-sans text-slate-800 antialiased selection:bg-teal-100">
+
+  <!-- メインアプリコンテナ（スマホ幅基準） -->
+  <div class="app-container flex flex-col justify-between relative pb-8">
+
+    <div>
+      <!-- ヘッダー -->
+      <header class="bg-teal-700 text-white px-5 pt-4 pb-5 rounded-b-3xl shadow-sm">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <div class="bg-white/20 p-2 rounded-xl backdrop-blur-sm">
+              <!-- 水滴・ケアアイコン -->
+              <svg class="w-6 h-6 text-teal-50" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 2.25c-5.385 5.385-8.25 9.18-8.25 12.75a8.25 8.25 0 1016.5 0c0-3.57-2.865-7.365-8.25-12.75z" />
+              </svg>
+            </div>
+            <div>
+              <h1 class="text-lg font-bold tracking-tight leading-tight">ケア排尿ノート</h1>
+              <p id="currentDateDisplay" class="text-xs text-teal-100 font-medium mt-0.5">--月--日 (--)</p>
+            </div>
+          </div>
+
+          <!-- 右上：設定・基準時間切替ボタン -->
+          <button id="openSettingsBtn" type="button" class="tap-btn flex items-center gap-1.5 bg-teal-800/80 hover:bg-teal-800 text-teal-50 text-xs font-medium px-3 py-2 rounded-xl border border-teal-600/50">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span>予測設定</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- 1. 次回排尿予測カード -->
+      <section class="px-4 -mt-3">
+        <div class="bg-white rounded-2xl shadow-md border border-slate-100 p-5">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-bold text-slate-500 flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-teal-500 animate-pulse"></span>
+              次回の排尿予測タイミング
+            </span>
+            <!-- ステータスバッジ -->
+            <span id="predictionBadge" class="text-xs font-bold px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200">
+              計算中...
+            </span>
+          </div>
+
+          <!-- メイン予測時刻＆カウントダウン -->
+          <div class="flex items-baseline justify-between my-2">
+            <div>
+              <div class="flex items-baseline gap-1">
+                <span id="predictedTimeText" class="font-num text-4xl font-bold text-slate-900 tracking-tight">--:--</span>
+                <span class="text-base font-bold text-slate-600">頃</span>
+              </div>
+              <p id="lastUrinationInfo" class="text-xs text-slate-500 mt-1">前回排尿: --:--</p>
+            </div>
+
+            <div class="text-right">
+              <div id="countdownText" class="font-num text-xl font-bold text-teal-700">あと --分</div>
+              <p id="fluidAdjustmentBadge" class="hidden text-[11px] font-medium text-sky-600 bg-sky-50 px-2 py-0.5 rounded-md mt-1 inline-block">
+                水分摂取により前倒し中
+              </p>
+            </div>
+          </div>
+
+          <!-- 平均間隔＆ロジック説明バー -->
+          <div class="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
+            <div class="flex items-center gap-1.5">
+              <svg class="w-4 h-4 text-teal-600 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>平均間隔: <strong id="avgIntervalText" class="text-slate-800 font-num">約 3時間00分</strong></span>
+            </div>
+            <span id="predictionBasisText" class="text-[11px] text-slate-400">直近の記録から算出</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. ワンタップ記録セクション -->
+      <section class="px-4 mt-5">
+        <div class="flex items-center justify-between mb-2.5">
+          <h2 class="text-sm font-bold text-slate-700 flex items-center gap-1.5">
+            <span>今すぐ記録する</span>
+            <span class="text-[11px] font-normal text-slate-400">（タップで即時保存）</span>
+          </h2>
+          <button id="openCustomModalBtn" type="button" class="tap-btn text-xs font-bold text-teal-700 hover:text-teal-800 bg-teal-50 hover:bg-teal-100 px-3 py-1.5 rounded-xl flex items-center gap-1 border border-teal-200/70">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            <span>時間を指定して記録</span>
+          </button>
+        </div>
+
+        <!-- メインアクションボタン（排尿・排便） -->
+        <div class="grid grid-cols-2 gap-3">
+          <!-- 排尿ボタン群 -->
+          <div class="bg-white p-3 rounded-2xl border border-teal-100 shadow-sm flex flex-col justify-between">
+            <button onclick="quickLog('urination', '普通')" type="button" class="tap-btn w-full bg-teal-600 hover:bg-teal-700 text-white rounded-xl py-3.5 px-3 flex flex-col items-center justify-center shadow-sm">
+              <div class="flex items-center gap-1.5">
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2.25c-5.385 5.385-8.25 9.18-8.25 12.75a8.25 8.25 0 1016.5 0c0-3.57-2.865-7.365-8.25-12.75z" />
+                </svg>
+                <span class="text-base font-bold">排尿 (おしっこ)</span>
+              </div>
+              <span class="text-[11px] text-teal-100 mt-0.5">普通量でワンタップ記録</span>
+            </button>
+            <!-- 排尿量のクイック選択 -->
+            <div class="grid grid-cols-3 gap-1.5 mt-2">
+              <button onclick="quickLog('urination', '少なめ')" type="button" class="tap-btn text-xs font-medium py-1.5 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200/60">少なめ</button>
+              <button onclick="quickLog('urination', '普通')" type="button" class="tap-btn text-xs font-medium py-1.5 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200/60">普通</button>
+              <button onclick="quickLog('urination', '多め')" type="button" class="tap-btn text-xs font-medium py-1.5 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200/60">多め</button>
+            </div>
+          </div>
+
+          <!-- 排便ボタン群 -->
+          <div class="bg-white p-3 rounded-2xl border border-amber-100 shadow-sm flex flex-col justify-between">
+            <button onclick="quickLog('bowel', '普通')" type="button" class="tap-btn w-full bg-amber-500 hover:bg-amber-600 text-white rounded-xl py-3.5 px-3 flex flex-col items-center justify-center shadow-sm">
+              <div class="flex items-center gap-1.5">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span class="text-base font-bold">排便 (うんち)</span>
+              </div>
+              <span class="text-[11px] text-amber-50 mt-0.5">普通便でワンタップ記録</span>
+            </button>
+            <!-- 便状態のクイック選択 -->
+            <div class="grid grid-cols-3 gap-1.5 mt-2">
+              <button onclick="quickLog('bowel', '普通')" type="button" class="tap-btn text-xs font-medium py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200/60">普通</button>
+              <button onclick="quickLog('bowel', '軟便')" type="button" class="tap-btn text-xs font-medium py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200/60">軟便</button>
+              <button onclick="quickLog('bowel', '硬め')" type="button" class="tap-btn text-xs font-medium py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200/60">硬め</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- サブアクション（水分摂取・パッド交換） -->
+        <div class="grid grid-cols-12 gap-2.5 mt-3">
+          <!-- 水分摂取プリセット -->
+          <div class="col-span-8 bg-white p-3 rounded-2xl border border-sky-100 shadow-sm">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold text-sky-800 flex items-center gap-1">
+                <svg class="w-4 h-4 text-sky-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23-.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0112 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5" />
+                </svg>
+                水分摂取 (予測に反映)
+              </span>
+            </div>
+            <div class="grid grid-cols-3 gap-1.5">
+              <button onclick="quickLog('fluid', '100ml', 100)" type="button" class="tap-btn py-2 px-1 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200/70 flex flex-col items-center">
+                <span class="font-num text-xs font-bold">100ml</span>
+                <span class="text-[10px] text-sky-600">湯呑み1杯</span>
+              </button>
+              <button onclick="quickLog('fluid', '150ml', 150)" type="button" class="tap-btn py-2 px-1 rounded-xl bg-sky-500 hover:bg-sky-600 text-white shadow-sm flex flex-col items-center">
+                <span class="font-num text-xs font-bold">150ml</span>
+                <span class="text-[10px] text-sky-100">コップ1杯</span>
+              </button>
+              <button onclick="quickLog('fluid', '200ml', 200)" type="button" class="tap-btn py-2 px-1 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200/70 flex flex-col items-center">
+                <span class="font-num text-xs font-bold">200ml</span>
+                <span class="text-[10px] text-sky-600">大きめ1杯</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- パッド・オムツ交換 -->
+          <div class="col-span-4 bg-white p-3 rounded-2xl border border-indigo-100 shadow-sm flex flex-col">
+            <button onclick="quickLog('pad', 'パッド・オムツ交換')" type="button" class="tap-btn flex-1 w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200/80 rounded-xl p-2 flex flex-col items-center justify-center text-center">
+              <svg class="w-5 h-5 text-indigo-600 mb-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+              </svg>
+              <span class="text-xs font-bold leading-tight">パッド<br>交換のみ</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. 本日のサマリー＆排尿日誌（履歴タイムライン） -->
+      <section class="px-4 mt-6">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-sm font-bold text-slate-700 flex items-center gap-1.5">
+            <svg class="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25z" />
+            </svg>
+            <span>本日のサマリー・排尿日誌</span>
+          </h2>
+
+          <!-- CSV出力ボタン -->
+          <button id="exportCsvBtn" type="button" class="tap-btn text-xs font-bold text-slate-600 hover:text-slate-800 bg-white hover:bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5 text-teal-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+            </svg>
+            <span>CSV出力</span>
+          </button>
+        </div>
+
+        <!-- 本日の集計カード -->
+        <div class="grid grid-cols-3 gap-2.5 mb-4">
+          <div class="bg-white rounded-2xl p-3 border border-slate-100 shadow-sm text-center">
+            <span class="text-[11px] font-medium text-slate-500 block">本日の排尿</span>
+            <div class="mt-0.5 flex items-baseline justify-center gap-0.5">
+              <span id="todayUrinationCount" class="font-num text-2xl font-bold text-teal-700">0</span>
+              <span class="text-xs font-bold text-slate-600">回</span>
+            </div>
+          </div>
+          <div class="bg-white rounded-2xl p-3 border border-slate-100 shadow-sm text-center">
+            <span class="text-[11px] font-medium text-slate-500 block">本日の排便</span>
+            <div class="mt-0.5 flex items-baseline justify-center gap-0.5">
+              <span id="todayBowelCount" class="font-num text-2xl font-bold text-amber-600">0</span>
+              <span class="text-xs font-bold text-slate-600">回</span>
+            </div>
+          </div>
+          <div class="bg-white rounded-2xl p-3 border border-slate-100 shadow-sm text-center">
+            <span class="text-[11px] font-medium text-slate-500 block">総水分摂取</span>
+            <div class="mt-0.5 flex items-baseline justify-center gap-0.5">
+              <span id="todayFluidTotal" class="font-num text-2xl font-bold text-sky-600">0</span>
+              <span class="text-xs font-bold text-slate-600">ml</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 履歴タイムラインリスト -->
+        <div id="timelineContainer" class="space-y-4">
+          <!-- JavaScriptで動的に描画 -->
+        </div>
+      </section>
+    </div>
+
+    <!-- フッター（デモ・データ管理ユーティリティ） -->
+    <footer class="px-4 mt-10 pt-5 border-t border-slate-200/80 text-center">
+      <p class="text-[11px] text-slate-400 mb-3">
+        ※記録データはお使いの端末のブラウザ内に自動保存されます。
+      </p>
+      <div class="flex items-center justify-center gap-2.5">
+        <button id="loadSampleBtn" type="button" class="tap-btn text-xs font-medium text-slate-600 bg-white hover:bg-slate-100 px-3 py-2 rounded-xl border border-slate-200">
+          サンプルデータ読込
+        </button>
+        <button id="clearAllBtn" type="button" class="tap-btn text-xs font-medium text-rose-600 bg-rose-50 hover:bg-rose-100 px-3 py-2 rounded-xl border border-rose-200/70">
+          データ全消去
+        </button>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- ========================================== -->
+  <!-- モーダル1: 時間指定記録 / 記録編集モーダル -->
+  <!-- ========================================== -->
+  <div id="entryModal" class="hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white w-full max-w-[460px] rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 id="entryModalTitle" class="text-base font-bold text-slate-800">時間を指定して記録</h3>
+        <button type="button" onclick="closeEntryModal()" class="p-1.5 rounded-full text-slate-400 hover:bg-slate-100">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <form id="entryForm" class="mt-4 space-y-4">
+        <input type="hidden" id="editEntryId" value="" />
+
+        <!-- 種別選択 -->
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1.5">記録の種類</label>
+          <div class="grid grid-cols-4 gap-2">
+            <label class="cursor-pointer">
+              <input type="radio" name="entryType" value="urination" class="peer sr-only" checked onchange="updateModalDetailOptions()">
+              <div class="text-center py-2 px-1 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 peer-checked:bg-teal-600 peer-checked:text-white peer-checked:border-teal-600 transition">排尿</div>
+            </label>
+            <label class="cursor-pointer">
+              <input type="radio" name="entryType" value="bowel" class="peer sr-only" onchange="updateModalDetailOptions()">
+              <div class="text-center py-2 px-1 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 peer-checked:bg-amber-500 peer-checked:text-white peer-checked:border-amber-500 transition">排便</div>
+            </label>
+            <label class="cursor-pointer">
+              <input type="radio" name="entryType" value="fluid" class="peer sr-only" onchange="updateModalDetailOptions()">
+              <div class="text-center py-2 px-1 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 peer-checked:bg-sky-500 peer-checked:text-white peer-checked:border-sky-500 transition">水分</div>
+            </label>
+            <label class="cursor-pointer">
+              <input type="radio" name="entryType" value="pad" class="peer sr-only" onchange="updateModalDetailOptions()">
+              <div class="text-center py-2 px-1 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 peer-checked:bg-indigo-500 peer-checked:text-white peer-checked:border-indigo-500 transition">パッド</div>
+            </label>
+          </div>
+        </div>
+
+        <!-- 日時入力 -->
+        <div>
+          <label for="entryDateTime" class="block text-xs font-bold text-slate-600 mb-1.5">記録日時</label>
+          <input type="datetime-local" id="entryDateTime" required class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm font-num text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500" />
+        </div>
+
+        <!-- 状態・量（種別に応じて切替） -->
+        <div id="detailSelectWrapper">
+          <label id="detailLabel" for="entryDetail" class="block text-xs font-bold text-slate-600 mb-1.5">量・状態</label>
+          <select id="entryDetail" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500">
+            <!-- JSで動的生成 -->
+          </select>
+        </div>
+
+        <!-- メモ入力 -->
+        <div>
+          <label for="entryNote" class="block text-xs font-bold text-slate-600 mb-1.5">メモ（任意）</label>
+          <input type="text" id="entryNote" placeholder="例：失禁なし、トイレ誘導成功、お茶など" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500" />
+        </div>
+
+        <div class="pt-2 flex gap-2.5">
+          <button type="button" onclick="closeEntryModal()" class="tap-btn flex-1 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold">
+            キャンセル
+          </button>
+          <button type="submit" class="tap-btn flex-1 py-3 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold shadow-sm">
+            保存する
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- モーダル2: 予測アルゴリズム設定モーダル -->
+  <!-- ========================================== -->
+  <div id="settingsModal" class="hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white w-full max-w-[460px] rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 class="text-base font-bold text-slate-800">排尿予測の設定</h3>
+        <button type="button" onclick="closeSettingsModal()" class="p-1.5 rounded-full text-slate-400 hover:bg-slate-100">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <form id="settingsForm" class="mt-4 space-y-4">
+        <div>
+          <label for="defaultIntervalInput" class="block text-xs font-bold text-slate-700 mb-1">
+            基本の排尿間隔（データが少ない時の基準値）
+          </label>
+          <p class="text-[11px] text-slate-500 mb-2">排尿記録が2件未満の場合にこの間隔で予測します。</p>
+          <select id="defaultIntervalInput" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 bg-white">
+            <option value="120">2時間 00分</option>
+            <option value="150">2時間 30分</option>
+            <option value="180" selected>3時間 00分（標準）</option>
+            <option value="210">3時間 30分</option>
+            <option value="240">4時間 00分</option>
+          </select>
+        </div>
+
+        <div class="flex items-center justify-between bg-slate-50 p-3.5 rounded-2xl border border-slate-200/70">
+          <div class="pr-3">
+            <span class="text-xs font-bold text-slate-800 block">夜間モード自動補正（21時〜翌6時）</span>
+            <span class="text-[11px] text-slate-500">夜間は排尿間隔を約1.25倍長めに見積もります。</span>
+          </div>
+          <input type="checkbox" id="nightModeToggle" checked class="w-5 h-5 accent-teal-600 rounded cursor-pointer" />
+        </div>
+
+        <div class="flex items-center justify-between bg-slate-50 p-3.5 rounded-2xl border border-slate-200/70">
+          <div class="pr-3">
+            <span class="text-xs font-bold text-slate-800 block">水分摂取による予測前倒し</span>
+            <span class="text-[11px] text-slate-500">水分記録後、摂取量に応じて次回予測を15〜30分早めます。</span>
+          </div>
+          <input type="checkbox" id="fluidAdjustToggle" checked class="w-5 h-5 accent-teal-600 rounded cursor-pointer" />
+        </div>
+
+        <div class="pt-2">
+          <button type="submit" class="tap-btn w-full py-3 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold shadow-sm">
+            設定を適用する
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- モーダル3: 確認ダイアログ（alert/confirm代替） -->
+  <!-- ========================================== -->
+  <div id="confirmModal" class="hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-[360px] rounded-3xl p-5 shadow-2xl text-center">
+      <div class="w-12 h-12 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto mb-3">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+        </svg>
+      </div>
+      <h3 id="confirmTitle" class="text-base font-bold text-slate-800">確認</h3>
+      <p id="confirmMessage" class="text-xs text-slate-600 mt-1.5 leading-relaxed">実行してもよろしいですか？</p>
+      <div class="mt-5 flex gap-2.5">
+        <button id="confirmCancelBtn" type="button" class="tap-btn flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold">
+          キャンセル
+        </button>
+        <button id="confirmOkBtn" type="button" class="tap-btn flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold">
+          実行する
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- トースト通知エリア -->
+  <div id="toastContainer" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 pointer-events-none flex flex-col items-center gap-2 w-full max-w-[420px] px-4"></div>
+
+  <!-- ========================================== -->
+  <!-- アプリケーション ロジック (JavaScript)     -->
+  <!-- ========================================== -->
+  <script>
+    /**
+     * ケア排尿ノート - 状態管理および予測アルゴリズム
+     */
+    const STORAGE_KEY = 'care_urination_logs_v1';
+    const SETTINGS_KEY = 'care_urination_settings_v1';
+
+    // アプリケーション状態
+    let logs = [];
+    let settings = {
+      defaultIntervalMins: 180, // デフォルト3時間
+      nightMode: true,
+      fluidAdjust: true
+    };
+    let confirmCallback = null;
+
+    // 初期化処理
+    document.addEventListener('DOMContentLoaded', () => {
+      loadSettings();
+      loadLogs();
+      updateHeaderDate();
+      renderAll();
+
+      // 15秒ごとにカウントダウンと予測表示をリアルタイム更新
+      setInterval(() => {
+        updateHeaderDate();
+        renderPredictionCard();
+      }, 15000);
+
+      setupEventListeners();
+    });
+
+    // ヘッダーの日付表示更新
+    function updateHeaderDate() {
+      const now = new Date();
+      const days = ['日', '月', '火', '水', '木', '金', '土'];
+      const month = now.getMonth() + 1;
+      const date = now.getDate();
+      const day = days[now.getDay()];
+      document.getElementById('currentDateDisplay').textContent = `${month}月${date}日 (${day})`;
+    }
+
+    // 設定の読み込み・保存
+    function loadSettings() {
+      try {
+        const saved = localStorage.getItem(SETTINGS_KEY);
+        if (saved) {
+          settings = { ...settings, ...JSON.parse(saved) };
+        }
+      } catch (e) {
+        console.error('設定の読み込みに失敗:', e);
+      }
+      document.getElementById('defaultIntervalInput').value = settings.defaultIntervalMins;
+      document.getElementById('nightModeToggle').checked = settings.nightMode;
+      document.getElementById('fluidAdjustToggle').checked = settings.fluidAdjust;
+    }
+
+    function saveSettings() {
+      try {
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+      } catch (e) {
+        console.error('設定の保存に失敗:', e);
+      }
+    }
+
+    // ログの読み込み（初回空の場合はリアルなサンプルデータを自動生成）
+    function loadLogs() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          logs = JSON.parse(saved);
+        } else {
+          logs = createSampleLogs();
+          saveLogs();
+        }
+      } catch (e) {
+        console.error('記録の読み込みに失敗:', e);
+        logs = [];
+      }
+    }
+
+    function saveLogs() {
+      try {
+        // 常に時系列順（新しい順）にソートして保存
+        logs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(logs));
+      } catch (e) {
+        console.error('記録の保存に失敗:', e);
+        showToast('データの保存に失敗しました', 'error');
+      }
+    }
+
+    // サンプルデータ生成（現在時刻を基準に今日の自然なケア記録を生成）
+    function createSampleLogs() {
+      const now = new Date();
+      const minsAgo = (m) => new Date(now.getTime() - m * 60000).toISOString();
+
+      return [
+        {
+          id: 'sample-1',
+          type: 'fluid',
+          timestamp: minsAgo(35),
+          detail: '150ml',
+          fluidAmount: 150,
+          note: 'お茶（コップ1杯）'
+        },
+        {
+          id: 'sample-2',
+          type: 'urination',
+          timestamp: minsAgo(95), // 1時間35分前
+          detail: '普通',
+          fluidAmount: 0,
+          note: 'トイレ誘導にて排尿'
+        },
+        {
+          id: 'sample-3',
+          type: 'bowel',
+          timestamp: minsAgo(240), // 4時間前
+          detail: '普通',
+          fluidAmount: 0,
+          note: '朝食後'
+        },
+        {
+          id: 'sample-4',
+          type: 'urination',
+          timestamp: minsAgo(245), // 4時間5分前（前回との間隔 = 2時間30分）
+          detail: '多め',
+          fluidAmount: 0,
+          note: '起床後トイレ'
+        },
+        {
+          id: 'sample-5',
+          type: 'fluid',
+          timestamp: minsAgo(310),
+          detail: '200ml',
+          fluidAmount: 200,
+          note: '白湯'
+        },
+        {
+          id: 'sample-6',
+          type: 'urination',
+          timestamp: minsAgo(415), // 6時間55分前（前回との間隔 = 2時間50分）
+          detail: '普通',
+          fluidAmount: 0,
+          note: '夜間パッド交換も実施'
+        }
+      ];
+    }
+
+    // ワンタップ記録アクション
+    function quickLog(type, detail, fluidAmount = 0) {
+      const newEntry = {
+        id: 'log-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+        type,
+        timestamp: new Date().toISOString(),
+        detail,
+        fluidAmount,
+        note: ''
+      };
+      logs.unshift(newEntry);
+      saveLogs();
+      renderAll();
+
+      const labelMap = {
+        urination: `排尿（${detail}）を記録しました`,
+        bowel: `排便（${detail}）を記録しました`,
+        fluid: `水分摂取（${detail}）を記録しました`,
+        pad: `パッド・オムツ交換を記録しました`
+      };
+      showToast(labelMap[type] || '記録しました');
+    }
+
+    // ==========================================
+    // 排尿予測アルゴリズム
+    // ==========================================
+    function calculatePrediction() {
+      // 古い順に並べた排尿記録を抽出
+      const urinations = logs
+        .filter(item => item.type === 'urination')
+        .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+      if (urinations.length === 0) {
+        return {
+          hasData: false,
+          predictedDate: new Date(Date.now() + settings.defaultIntervalMins * 60000),
+          avgIntervalMins: settings.defaultIntervalMins,
+          lastUrinationDate: null,
+          fluidReducedMins: 0,
+          basisText: '初期基準値から算出'
+        };
+      }
+
+      const lastUrination = urinations[urinations.length - 1];
+      const lastUrinationDate = new Date(lastUrination.timestamp);
+
+      // 1. 直近の排尿間隔（最大直近5区間）から平均間隔を算出
+      // 極端に短い(20分未満)または長い(10時間超)異常値は重みを抑える
+      const intervals = [];
+      for (let i = 1; i < urinations.length; i++) {
+        const diffMins = (new Date(urinations[i].timestamp) - new Date(urinations[i - 1].timestamp)) / 60000;
+        if (diffMins >= 20 && diffMins <= 600) {
+          intervals.push(diffMins);
+        }
+      }
+
+      let avgIntervalMins = settings.defaultIntervalMins;
+      let basisText = `基準値(${formatDuration(settings.defaultIntervalMins)})を使用`;
+
+      if (intervals.length > 0) {
+        const recentIntervals = intervals.slice(-5); // 直近5回分
+        const sum = recentIntervals.reduce((acc, v) => acc + v, 0);
+        avgIntervalMins = Math.round(sum / recentIntervals.length);
+        basisText = `直近${recentIntervals.length}回の平均から算出`;
+      }
+
+      // 2. 夜間モード補正（21:00〜翌6:00の間は間隔を1.25倍に調整）
+      let effectiveIntervalMins = avgIntervalMins;
+      const currentHour = new Date().getHours();
+      const isNight = currentHour >= 21 || currentHour < 6;
+      if (settings.nightMode && isNight) {
+        effectiveIntervalMins = Math.round(effectiveIntervalMins * 1.25);
+        basisText += '・夜間補正中';
+      }
+
+      // 3. 前回排尿以降の水分摂取量に応じた前倒し補正
+      let fluidReducedMins = 0;
+      if (settings.fluidAdjust) {
+        const fluidsSinceLast = logs.filter(item =>
+          item.type === 'fluid' && new Date(item.timestamp) > lastUrinationDate
+        );
+        const totalFluidSinceLast = fluidsSinceLast.reduce((sum, f) => sum + (Number(f.fluidAmount) || 0), 0);
+
+        if (totalFluidSinceLast >= 100) {
+          // 100mlあたり約10分前倒し（最大35分まで）
+          fluidReducedMins = Math.min(35, Math.round((totalFluidSinceLast / 100) * 10));
+          effectiveIntervalMins = Math.max(45, effectiveIntervalMins - fluidReducedMins);
+        }
+      }
+
+      const predictedDate = new Date(lastUrinationDate.getTime() + effectiveIntervalMins * 60000);
+
+      return {
+        hasData: true,
+        predictedDate,
+        avgIntervalMins,
+        lastUrinationDate,
+        fluidReducedMins,
+        basisText
+      };
+    }
+
+    // 予測カードのUI描画
+    function renderPredictionCard() {
+      const pred = calculatePrediction();
+      const now = new Date();
+
+      const timeStr = formatTime(pred.predictedDate);
+      document.getElementById('predictedTimeText').textContent = timeStr;
+      document.getElementById('avgIntervalText').textContent = `約 ${formatDuration(pred.avgIntervalMins)}`;
+      document.getElementById('predictionBasisText').textContent = pred.basisText;
+
+      if (pred.lastUrinationDate) {
+        document.getElementById('lastUrinationInfo').textContent =
+          `前回排尿: ${formatTime(pred.lastUrinationDate)}（${getRelativePastText(pred.lastUrinationDate)}）`;
+      } else {
+        document.getElementById('lastUrinationInfo').textContent = '前回の排尿記録がありません';
+      }
+
+      // 水分前倒しバッジ
+      const fluidBadge = document.getElementById('fluidAdjustmentBadge');
+      if (pred.fluidReducedMins > 0) {
+        fluidBadge.textContent = `水分摂取により約${pred.fluidReducedMins}分前倒し`;
+        fluidBadge.classList.remove('hidden');
+      } else {
+        fluidBadge.classList.add('hidden');
+      }
+
+      // カウントダウン＆ステータスバッジの色分け
+      const diffMins = Math.round((pred.predictedDate - now) / 60000);
+      const badgeEl = document.getElementById('predictionBadge');
+      const countdownEl = document.getElementById('countdownText');
+
+      if (diffMins > 20) {
+        badgeEl.textContent = '余裕あり';
+        badgeEl.className = 'text-xs font-bold px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200';
+        countdownEl.textContent = `あと ${formatDuration(diffMins)}`;
+        countdownEl.className = 'font-num text-xl font-bold text-teal-700';
+      } else if (diffMins >= 0) {
+        badgeEl.textContent = 'そろそろ目安';
+        badgeEl.className = 'text-xs font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-300';
+        countdownEl.textContent = diffMins === 0 ? 'まもなく予測時刻' : `あと ${diffMins}分`;
+        countdownEl.className = 'font-num text-xl font-bold text-amber-600';
+      } else {
+        const overdueMins = Math.abs(diffMins);
+        badgeEl.textContent = '予測時刻を超過';
+        badgeEl.className = 'text-xs font-bold px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-300';
+        countdownEl.textContent = `${formatDuration(overdueMins)} 経過`;
+        countdownEl.className = 'font-num text-xl font-bold text-rose-600';
+      }
+    }
+
+    // 全体の再描画
+    function renderAll() {
+      renderPredictionCard();
+      renderSummary();
+      renderTimeline();
+    }
+
+    // 本日のサマリー集計の描画
+    function renderSummary() {
+      const todayKey = getDateKey(new Date());
+      const todayLogs = logs.filter(item => getDateKey(new Date(item.timestamp)) === todayKey);
+
+      const urinationCount = todayLogs.filter(i => i.type === 'urination').length;
+      const bowelCount = todayLogs.filter(i => i.type === 'bowel').length;
+      const fluidTotal = todayLogs
+        .filter(i => i.type === 'fluid')
+        .reduce((sum, i) => sum + (Number(i.fluidAmount) || 0), 0);
+
+      document.getElementById('todayUrinationCount').textContent = urinationCount;
+      document.getElementById('todayBowelCount').textContent = bowelCount;
+      document.getElementById('todayFluidTotal').textContent = fluidTotal;
+    }
+
+    // 履歴タイムラインの描画
+    function renderTimeline() {
+      const container = document.getElementById('timelineContainer');
+      if (logs.length === 0) {
+        container.innerHTML = `
+          <div class="bg-white rounded-2xl p-8 text-center border border-slate-100 shadow-xs">
+            <p class="text-sm font-bold text-slate-600">まだ記録がありません</p>
+            <p class="text-xs text-slate-400 mt-1">上のボタンから排尿や水分摂取を記録してください。</p>
+          </div>
+        `;
+        return;
+      }
+
+      // 排尿同士の「前回からの間隔」を事前計算するため古い順に走査
+      const chronological = [...logs].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+      const intervalMap = {};
+      let prevUrinationTime = null;
+
+      chronological.forEach(item => {
+        if (item.type === 'urination') {
+          const currTime = new Date(item.timestamp);
+          if (prevUrinationTime) {
+            const diffMins = Math.round((currTime - prevUrinationTime) / 60000);
+            if (diffMins >= 0) {
+              intervalMap[item.id] = formatDuration(diffMins);
+            }
+          }
+          prevUrinationTime = currTime;
+        }
+      });
+
+      // 日付ごとにグループ化（新しい順）
+      const sortedLogs = [...logs].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      const groups = {};
+      sortedLogs.forEach(item => {
+        const key = getDateKey(new Date(item.timestamp));
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(item);
+      });
+
+      const todayKey = getDateKey(new Date());
+      const yesterdayKey = getDateKey(new Date(Date.now() - 86400000));
+
+      let html = '';
+      Object.keys(groups).forEach(dateKey => {
+        let dateLabel = formatDateLabel(dateKey);
+        if (dateKey === todayKey) dateLabel = `今日（${dateLabel}）`;
+        else if (dateKey === yesterdayKey) dateLabel = `昨日（${dateLabel}）`;
+
+        html += `
+          <div>
+            <div class="text-xs font-bold text-slate-500 mb-2 px-1 flex items-center gap-2">
+              <span>${dateLabel}</span>
+              <span class="h-px bg-slate-200 flex-1"></span>
+            </div>
+            <div class="space-y-2">
+        `;
+
+        groups[dateKey].forEach(item => {
+          const meta = getTypeVisualMeta(item.type);
+          const timeStr = formatTime(new Date(item.timestamp));
+          const intervalBadge = intervalMap[item.id]
+            ? `<span class="text-[11px] font-medium text-teal-700 bg-teal-50 px-2 py-0.5 rounded-md border border-teal-100">前回から ${intervalMap[item.id]}</span>`
+            : '';
+
+          html += `
+            <div class="bg-white rounded-2xl p-3.5 border border-slate-100 shadow-xs flex items-center justify-between gap-2">
+              <div class="flex items-start gap-3 min-w-0">
+                <!-- 時刻 -->
+                <div class="font-num text-sm font-bold text-slate-700 pt-0.5 w-12 shrink-0">
+                  ${timeStr}
+                </div>
+                <!-- アイコン -->
+                <div class="w-8 h-8 rounded-xl ${meta.bgClass} ${meta.textClass} flex items-center justify-center shrink-0">
+                  ${meta.iconSvg}
+                </div>
+                <!-- 内容 -->
+                <div class="min-w-0">
+                  <div class="flex flex-wrap items-center gap-1.5">
+                    <span class="text-sm font-bold text-slate-800">${meta.label}</span>
+                    ${item.detail ? `<span class="text-xs font-bold px-2 py-0.5 rounded-md ${meta.badgeClass}">${escapeHtml(item.detail)}</span>` : ''}
+                    ${intervalBadge}
+                  </div>
+                  ${item.note ? `<p class="text-xs text-slate-500 mt-1 truncate">${escapeHtml(item.note)}</p>` : ''}
+                </div>
+              </div>
+
+              <!-- 編集・削除ボタン -->
+              <div class="flex items-center gap-1 shrink-0">
+                <button type="button" onclick="openEditModal('${item.id}')" aria-label="編集" class="tap-btn p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-xl">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
+                  </svg>
+                </button>
+                <button type="button" onclick="confirmDeleteEntry('${item.id}')" aria-label="削除" class="tap-btn p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          `;
+        });
+
+        html += `</div></div>`;
+      });
+
+      container.innerHTML = html;
+    }
+
+    // 種別ごとの見た目定義
+    function getTypeVisualMeta(type) {
+      switch (type) {
+        case 'urination':
+          return {
+            label: '排尿',
+            bgClass: 'bg-teal-50',
+            textClass: 'text-teal-600',
+            badgeClass: 'bg-teal-100/80 text-teal-800',
+            iconSvg: '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.25c-5.385 5.385-8.25 9.18-8.25 12.75a8.25 8.25 0 1016.5 0c0-3.57-2.865-7.365-8.25-12.75z" /></svg>'
+          };
+        case 'bowel':
+          return {
+            label: '排便',
+            bgClass: 'bg-amber-50',
+            textClass: 'text-amber-600',
+            badgeClass: 'bg-amber-100/80 text-amber-800',
+            iconSvg: '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>'
+          };
+        case 'fluid':
+          return {
+            label: '水分摂取',
+            bgClass: 'bg-sky-50',
+            textClass: 'text-sky-600',
+            badgeClass: 'bg-sky-100/80 text-sky-800 font-num',
+            iconSvg: '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3" /></svg>'
+          };
+        default:
+          return {
+            label: 'ケア交換',
+            bgClass: 'bg-indigo-50',
+            textClass: 'text-indigo-600',
+            badgeClass: 'bg-indigo-100/80 text-indigo-800',
+            iconSvg: '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>'
+          };
+      }
+    }
+
+    // ==========================================
+    // モーダル制御（新規時間指定・編集・設定・確認）
+    // ==========================================
+    function openCustomModal() {
+      document.getElementById('entryModalTitle').textContent = '時間を指定して記録';
+      document.getElementById('editEntryId').value = '';
+      document.querySelector('input[name="entryType"][value="urination"]').checked = true;
+      document.getElementById('entryDateTime').value = toLocalDateTimeInputString(new Date());
+      document.getElementById('entryNote').value = '';
+      updateModalDetailOptions();
+      document.getElementById('entryModal').classList.remove('hidden');
+    }
+
+    function openEditModal(id) {
+      const entry = logs.find(item => item.id === id);
+      if (!entry) return;
+
+      document.getElementById('entryModalTitle').textContent = '記録の編集';
+      document.getElementById('editEntryId').value = entry.id;
+      const radio = document.querySelector(`input[name="entryType"][value="${entry.type}"]`);
+      if (radio) radio.checked = true;
+
+      document.getElementById('entryDateTime').value = toLocalDateTimeInputString(new Date(entry.timestamp));
+      updateModalDetailOptions(entry.detail);
+      document.getElementById('entryNote').value = entry.note || '';
+      document.getElementById('entryModal').classList.remove('hidden');
+    }
+
+    function closeEntryModal() {
+      document.getElementById('entryModal').classList.add('hidden');
+    }
+
+    function updateModalDetailOptions(selectedValue = null) {
+      const type = document.querySelector('input[name="entryType"]:checked').value;
+      const selectEl = document.getElementById('entryDetail');
+      const labelEl = document.getElementById('detailLabel');
+
+      let options = [];
+      if (type === 'urination') {
+        labelEl.textContent = '排尿の量';
+        options = ['普通', '少なめ', '多め'];
+      } else if (type === 'bowel') {
+        labelEl.textContent = '便の状態';
+        options = ['普通', '軟便', '硬め', '下痢気味'];
+      } else if (type === 'fluid') {
+        labelEl.textContent = '摂取量';
+        options = ['50ml', '100ml', '150ml', '200ml', '250ml', '300ml'];
+      } else {
+        labelEl.textContent = '交換内容';
+        options = ['パッド・オムツ交換', '尿とりパッドのみ交換', 'リハビリパンツ交換'];
+      }
+
+      selectEl.innerHTML = options.map(opt =>
+        `<option value="${opt}" ${opt === selectedValue ? 'selected' : ''}>${opt}</option>`
+      ).join('');
+    }
+
+    function closeSettingsModal() {
+      document.getElementById('settingsModal').classList.add('hidden');
+    }
+
+    // カスタム確認ダイアログ
+    function openConfirmModal(title, message, onConfirm) {
+      document.getElementById('confirmTitle').textContent = title;
+      document.getElementById('confirmMessage').textContent = message;
+      confirmCallback = onConfirm;
+      document.getElementById('confirmModal').classList.remove('hidden');
+    }
+
+    function closeConfirmModal() {
+      document.getElementById('confirmModal').classList.add('hidden');
+      confirmCallback = null;
+    }
+
+    function confirmDeleteEntry(id) {
+      openConfirmModal(
+        '記録の削除',
+        'この記録を削除してもよろしいですか？',
+        () => {
+          logs = logs.filter(item => item.id !== id);
+          saveLogs();
+          renderAll();
+          showToast('記録を削除しました');
+        }
+      );
+    }
+
+    // ==========================================
+    // CSVエクスポート（医師・ケアマネ提出用 排尿日誌）
+    // ==========================================
+    function exportToCsv() {
+      if (logs.length === 0) {
+        showToast('出力する記録データがありません', 'error');
+        return;
+      }
+
+      // 古い順にソートして排尿間隔を計算しながら出力
+      const sorted = [...logs].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+      const typeNameMap = {
+        urination: '排尿',
+        bowel: '排便',
+        fluid: '水分摂取',
+        pad: 'パッド・オムツ交換'
+      };
+
+      const rows = [
+        ['日付', '時刻', '記録種別', '量・状態', '水分量(ml)', '前回排尿からの間隔', 'メモ']
+      ];
+
+      let prevUrination = null;
+      sorted.forEach(item => {
+        const dt = new Date(item.timestamp);
+        const dateStr = `${dt.getFullYear()}/${String(dt.getMonth() + 1).padStart(2, '0')}/${String(dt.getDate()).padStart(2, '0')}`;
+        const timeStr = formatTime(dt);
+        let intervalStr = '';
+
+        if (item.type === 'urination') {
+          if (prevUrination) {
+            const diffMins = Math.round((dt - prevUrination) / 60000);
+            intervalStr = formatDuration(diffMins);
+          }
+          prevUrination = dt;
+        }
+
+        rows.push([
+          dateStr,
+          timeStr,
+          typeNameMap[item.type] || item.type,
+          item.detail || '',
+          item.type === 'fluid' ? (item.fluidAmount || 0) : '',
+          intervalStr,
+          (item.note || '').replace(/"/g, '""')
+        ]);
+      });
+
+      const csvContent = rows
+        .map(row => row.map(cell => `"${cell}"`).join(','))
+        .join('\r\n');
+
+      // Excelで文字化けしないようUTF-8 BOMを付与
+      const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+      const blob = new Blob([bom, csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+
+      const now = new Date();
+      const fileDate = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `排尿日誌_${fileDate}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      showToast('排尿日誌CSVをダウンロードしました');
+    }
+
+    // イベントリスナー登録
+    function setupEventListeners() {
+      document.getElementById('openCustomModalBtn').addEventListener('click', openCustomModal);
+
+      document.getElementById('entryForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const editId = document.getElementById('editEntryId').value;
+        const type = document.querySelector('input[name="entryType"]:checked').value;
+        const dateTimeVal = document.getElementById('entryDateTime').value;
+        const detail = document.getElementById('entryDetail').value;
+        const note = document.getElementById('entryNote').value.trim();
+
+        const timestamp = new Date(dateTimeVal).toISOString();
+        const fluidAmount = type === 'fluid' ? parseInt(detail.replace(/[^0-9]/g, ''), 10) || 0 : 0;
+
+        if (editId) {
+          const idx = logs.findIndex(item => item.id === editId);
+          if (idx !== -1) {
+            logs[idx] = { ...logs[idx], type, timestamp, detail, fluidAmount, note };
+          }
+          showToast('記録を更新しました');
+        } else {
+          logs.unshift({
+            id: 'log-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+            type,
+            timestamp,
+            detail,
+            fluidAmount,
+            note
+          });
+          showToast('指定時間で記録を保存しました');
+        }
+
+        saveLogs();
+        renderAll();
+        closeEntryModal();
+      });
+
+      // 設定モーダル
+      document.getElementById('openSettingsBtn').addEventListener('click', () => {
+        document.getElementById('settingsModal').classList.remove('hidden');
+      });
+
+      document.getElementById('settingsForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        settings.defaultIntervalMins = parseInt(document.getElementById('defaultIntervalInput').value, 10) || 180;
+        settings.nightMode = document.getElementById('nightModeToggle').checked;
+        settings.fluidAdjust = document.getElementById('fluidAdjustToggle').checked;
+        saveSettings();
+        renderPredictionCard();
+        closeSettingsModal();
+        showToast('予測設定を保存しました');
+      });
+
+      // 確認モーダルボタン
+      document.getElementById('confirmCancelBtn').addEventListener('click', closeConfirmModal);
+      document.getElementById('confirmOkBtn').addEventListener('click', () => {
+        if (typeof confirmCallback === 'function') {
+          confirmCallback();
+        }
+        closeConfirmModal();
+      });
+
+      // CSV出力
+      document.getElementById('exportCsvBtn').addEventListener('click', exportToCsv);
+
+      // サンプルデータ読込
+      document.getElementById('loadSampleBtn').addEventListener('click', () => {
+        openConfirmModal(
+          'サンプルデータの読込',
+          '現在の記録をサンプルデータに置き換えますか？',
+          () => {
+            logs = createSampleLogs();
+            saveLogs();
+            renderAll();
+            showToast('サンプルデータを読み込みました');
+          }
+        );
+      });
+
+      // データ全消去
+      document.getElementById('clearAllBtn').addEventListener('click', () => {
+        openConfirmModal(
+          'データの全消去',
+          '保存されているすべての記録を削除します。この操作は元に戻せません。',
+          () => {
+            logs = [];
+            saveLogs();
+            renderAll();
+            showToast('すべてのデータを消去しました');
+          }
+        );
+      });
+    }
+
+    // ==========================================
+    // ユーティリティ関数群
+    // ==========================================
+    function formatTime(date) {
+      const h = String(date.getHours()).padStart(2, '0');
+      const m = String(date.getMinutes()).padStart(2, '0');
+      return `${h}:${m}`;
+    }
+
+    function formatDuration(totalMins) {
+      const mins = Math.max(0, Math.round(totalMins));
+      const h = Math.floor(mins / 60);
+      const m = mins % 60;
+      if (h === 0) return `${m}分`;
+      if (m === 0) return `${h}時間`;
+      return `${h}時間${String(m).padStart(2, '0')}分`;
+    }
+
+    function getRelativePastText(pastDate) {
+      const diffMins = Math.max(0, Math.round((new Date() - pastDate) / 60000));
+      if (diffMins < 1) return 'たった今';
+      return `${formatDuration(diffMins)}前`;
+    }
+
+    function getDateKey(date) {
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    }
+
+    function formatDateLabel(dateKey) {
+      const [y, m, d] = dateKey.split('-').map(Number);
+      const dt = new Date(y, m - 1, d);
+      const days = ['日', '月', '火', '水', '木', '金', '土'];
+      return `${m}月${d}日(${days[dt.getDay()]})`;
+    }
+
+    function toLocalDateTimeInputString(date) {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      const h = String(date.getHours()).padStart(2, '0');
+      const min = String(date.getMinutes()).padStart(2, '0');
+      return `${y}-${m}-${d}T${h}:${min}`;
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function showToast(message, variant = 'success') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      const bgClass = variant === 'error' ? 'bg-rose-700' : 'bg-slate-800';
+      toast.className = `toast-enter ${bgClass} text-white text-xs font-bold px-4 py-3 rounded-2xl shadow-lg flex items-center gap-2`;
+      toast.innerHTML = `
+        <span class="w-2 h-2 rounded-full ${variant === 'error' ? 'bg-rose-300' : 'bg-teal-400'}"></span>
+        <span>${escapeHtml(message)}</span>
+      `;
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.25s ease';
+        setTimeout(() => toast.remove(), 250);
+      }, 2400);
+    }
+  </script>
+</body>
+</html>

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>ケア排尿ノート - 排尿記録・予測アプリ</title>
+  <title>ケア排尿ノート - パーソナライズ排尿予測アプリ</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Google Fonts: Noto Sans JP & Inter -->
@@ -35,7 +35,6 @@
     }
   </script>
   <style>
-    /* カスタムスクロールバーとモバイルアプリ風の質感調整 */
     body {
       background-color: #e2e8f0;
       -webkit-tap-highlight-color: transparent;
@@ -47,14 +46,12 @@
       background-color: #f8fafc;
       box-shadow: 0 10px 30px -5px rgba(15, 23, 42, 0.12);
     }
-    /* ボタンの押し心地アニメーション */
     .tap-btn {
-      transition: transform 0.1s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+      transition: transform 0.1s ease, background-color 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
     }
     .tap-btn:active {
       transform: scale(0.97);
     }
-    /* トースト通知アニメーション */
     @keyframes slideUp {
       from { transform: translate(-50%, 20px); opacity: 0; }
       to { transform: translate(-50%, 0); opacity: 1; }
@@ -62,7 +59,13 @@
     .toast-enter {
       animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
-
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .fade-in {
+      animation: fadeIn 0.3s ease forwards;
+    }
     /* 膀胱タンクの液体波アニメーション */
     @keyframes waveFlow {
       0% { transform: translateX(0); }
@@ -79,8 +82,145 @@
 </head>
 <body class="font-sans text-slate-800 antialiased selection:bg-teal-100">
 
-  <!-- メインアプリコンテナ（スマホ幅基準） -->
-  <div class="app-container flex flex-col justify-between relative pb-8">
+  <!-- ============================================================ -->
+  <!-- VIEW 1: クイック初期設定（オンボーディング画面）              -->
+  <!-- ============================================================ -->
+  <div id="onboardingView" class="hidden app-container flex flex-col justify-between p-5 sm:p-6 bg-gradient-to-b from-teal-50/70 via-white to-slate-50">
+    <div class="fade-in">
+      <!-- オンボーディングヘッダー -->
+      <div class="flex items-center gap-3 pt-2 pb-5">
+        <div class="w-11 h-11 rounded-2xl bg-teal-600 text-white flex items-center justify-center shadow-sm">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 2.25c-5.385 5.385-8.25 9.18-8.25 12.75a8.25 8.25 0 1016.5 0c0-3.57-2.865-7.365-8.25-12.75z" />
+          </svg>
+        </div>
+        <div>
+          <span class="text-[11px] font-bold text-teal-700 bg-teal-100/80 px-2 py-0.5 rounded-md">初回クイック設定（約20秒）</span>
+          <h1 class="text-xl font-bold text-slate-900 mt-1">あなた専用の予測モデルを作成</h1>
+        </div>
+      </div>
+
+      <p class="text-xs text-slate-600 leading-relaxed mb-5">
+        体格や普段のトイレ傾向に合わせて、膀胱タンクの容量と尿生成スピードの初期値を設定します。記録を重ねることでAIが自動学習します。
+      </p>
+
+      <form id="onboardingForm" class="space-y-5">
+        <!-- 質問1: 体重（kg） -->
+        <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
+          <div class="flex items-center justify-between mb-2">
+            <label for="obWeightInput" class="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <span class="w-5 h-5 rounded-full bg-teal-600 text-white font-num text-xs flex items-center justify-center">1</span>
+              <span>現在の体重（kg）</span>
+            </label>
+            <span id="obBaseRatePreview" class="text-[11px] font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-md font-num">
+              基礎生成: 48.0 ml/h
+            </span>
+          </div>
+          <div class="flex items-center gap-3 mt-2">
+            <input
+              type="number"
+              id="obWeightInput"
+              min="25"
+              max="200"
+              step="0.5"
+              value="60"
+              required
+              class="w-full font-num text-xl font-bold text-slate-900 bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white"
+            />
+            <span class="text-sm font-bold text-slate-600 shrink-0">kg</span>
+          </div>
+          <p class="text-[11px] text-slate-400 mt-1.5">※ 基礎尿生成速度 ＝ 体重 × 0.8 (ml/h) として計算します。</p>
+        </div>
+
+        <!-- 質問2: 普段のトイレの頻度（3択） -->
+        <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
+          <div class="text-sm font-bold text-slate-800 flex items-center gap-2 mb-3">
+            <span class="w-5 h-5 rounded-full bg-teal-600 text-white font-num text-xs flex items-center justify-center">2</span>
+            <span>普段のトイレの頻度</span>
+          </div>
+          <div class="space-y-2">
+            <label class="block cursor-pointer">
+              <input type="radio" name="obFrequency" value="260" class="peer sr-only">
+              <div class="p-3 rounded-xl border-2 border-slate-200 peer-checked:border-teal-600 peer-checked:bg-teal-50/70 transition flex items-center justify-between">
+                <div>
+                  <span class="text-sm font-bold text-slate-800 block">近い方（1日8回以上）</span>
+                  <span class="text-[11px] text-slate-500">こまめにトイレに行くタイプ</span>
+                </div>
+                <span class="font-num text-xs font-bold text-teal-700 bg-white px-2.5 py-1 rounded-lg border border-slate-200">初期容量 260ml</span>
+              </div>
+            </label>
+
+            <label class="block cursor-pointer">
+              <input type="radio" name="obFrequency" value="350" class="peer sr-only" checked>
+              <div class="p-3 rounded-xl border-2 border-slate-200 peer-checked:border-teal-600 peer-checked:bg-teal-50/70 transition flex items-center justify-between">
+                <div>
+                  <span class="text-sm font-bold text-slate-800 block">普通（1日5〜7回）</span>
+                  <span class="text-[11px] text-slate-500">標準的なトイレ間隔</span>
+                </div>
+                <span class="font-num text-xs font-bold text-teal-700 bg-white px-2.5 py-1 rounded-lg border border-slate-200">初期容量 350ml</span>
+              </div>
+            </label>
+
+            <label class="block cursor-pointer">
+              <input type="radio" name="obFrequency" value="430" class="peer sr-only">
+              <div class="p-3 rounded-xl border-2 border-slate-200 peer-checked:border-teal-600 peer-checked:bg-teal-50/70 transition flex items-center justify-between">
+                <div>
+                  <span class="text-sm font-bold text-slate-800 block">遠い方（1日4回以下）</span>
+                  <span class="text-[11px] text-slate-500">一度にしっかり溜められるタイプ</span>
+                </div>
+                <span class="font-num text-xs font-bold text-teal-700 bg-white px-2.5 py-1 rounded-lg border border-slate-200">初期容量 430ml</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- 質問3: カフェインへの敏感さ（2択） -->
+        <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
+          <div class="text-sm font-bold text-slate-800 flex items-center gap-2 mb-3">
+            <span class="w-5 h-5 rounded-full bg-teal-600 text-white font-num text-xs flex items-center justify-center">3</span>
+            <span>カフェインへの敏感さ（コーヒー・緑茶など）</span>
+          </div>
+          <div class="grid grid-cols-2 gap-2.5">
+            <label class="block cursor-pointer">
+              <input type="radio" name="obCaffeine" value="1.5" class="peer sr-only">
+              <div class="h-full p-3 rounded-xl border-2 border-slate-200 peer-checked:border-teal-600 peer-checked:bg-teal-50/70 transition flex flex-col justify-between">
+                <div>
+                  <span class="text-sm font-bold text-slate-800 block">影響を受けやすい</span>
+                  <span class="text-[11px] text-slate-500 mt-0.5 block">飲むとすぐトイレが近くなる</span>
+                </div>
+                <span class="font-num text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded mt-2 inline-block self-start">係数 1.5倍</span>
+              </div>
+            </label>
+
+            <label class="block cursor-pointer">
+              <input type="radio" name="obCaffeine" value="1.15" class="peer sr-only" checked>
+              <div class="h-full p-3 rounded-xl border-2 border-slate-200 peer-checked:border-teal-600 peer-checked:bg-teal-50/70 transition flex flex-col justify-between">
+                <div>
+                  <span class="text-sm font-bold text-slate-800 block">あまり変わらない</span>
+                  <span class="text-[11px] text-slate-500 mt-0.5 block">利尿作用の影響は少なめ</span>
+                </div>
+                <span class="font-num text-[11px] font-bold text-teal-700 bg-teal-100/70 px-2 py-0.5 rounded mt-2 inline-block self-start">係数 1.15倍</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="pt-2 pb-4">
+          <button type="submit" class="tap-btn w-full py-4 rounded-2xl bg-teal-600 hover:bg-teal-700 text-white text-base font-bold shadow-md flex items-center justify-center gap-2">
+            <span>この設定で記録をはじめる</span>
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+            </svg>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- VIEW 2: メインダッシュボード画面                            -->
+  <!-- ============================================================ -->
+  <div id="mainDashboardView" class="hidden app-container flex flex-col justify-between relative pb-8">
 
     <div>
       <!-- ヘッダー -->
@@ -88,7 +228,6 @@
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2.5">
             <div class="bg-white/20 p-2 rounded-xl backdrop-blur-sm">
-              <!-- 水滴・ケアアイコン -->
               <svg class="w-6 h-6 text-teal-50" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 2.25c-5.385 5.385-8.25 9.18-8.25 12.75a8.25 8.25 0 1016.5 0c0-3.57-2.865-7.365-8.25-12.75z" />
               </svg>
@@ -99,13 +238,13 @@
             </div>
           </div>
 
-          <!-- 右上：設定・基準時間切替ボタン -->
-          <button id="openSettingsBtn" type="button" class="tap-btn flex items-center gap-1.5 bg-teal-800/80 hover:bg-teal-800 text-teal-50 text-xs font-medium px-3 py-2 rounded-xl border border-teal-600/50">
+          <!-- 右上：設定（歯車アイコン）ボタン -->
+          <button id="openSettingsBtn" type="button" class="tap-btn flex items-center gap-1.5 bg-teal-800/80 hover:bg-teal-800 text-teal-50 text-xs font-bold px-3 py-2 rounded-xl border border-teal-600/50">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
               <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
-            <span>予測設定</span>
+            <span>設定</span>
           </button>
         </div>
       </header>
@@ -113,41 +252,36 @@
       <!-- 1. 膀胱タンクゲージ＆次回排尿予測レンジカード -->
       <section class="px-4 -mt-3">
         <div class="bg-white rounded-2xl shadow-md border border-slate-100 p-4 sm:p-5">
-          <div class="flex items-center justify-between mb-3">
+          <!-- 上段：タイトル＆学習ステータスバッジ -->
+          <div class="flex items-center justify-between gap-2 mb-3">
             <span class="text-xs font-bold text-slate-500 flex items-center gap-1.5">
               <span id="predictionPulseDot" class="w-2 h-2 rounded-full bg-teal-500 animate-pulse"></span>
-              膀胱チャージ状況＆次回目安
+              膀胱タンク＆予測目安
             </span>
-            <!-- ステータスバッジ -->
-            <span id="predictionBadge" class="text-xs font-bold px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200">
-              計算中...
-            </span>
-          </div>
-
-          <!-- 【データ不足時】データ収集案内ビュー -->
-          <div id="collectingDataView" class="my-1 py-3 px-3.5 rounded-xl bg-teal-50/70 border border-teal-100">
-            <div class="flex items-center justify-between gap-2">
-              <div>
-                <p id="remainingRecordsText" class="text-base font-bold text-teal-900">
-                  あと 3 回排尿を記録してください。
-                </p>
-                <p class="text-xs text-teal-700/90 mt-1">
-                  個人の排尿ペースを学習するため、最初の3回分のデータが必要です。
-                </p>
-              </div>
-              <div class="shrink-0 bg-white px-2.5 py-1.5 rounded-lg border border-teal-200 text-center">
-                <span class="text-[10px] text-slate-400 block leading-none">進捗</span>
-                <span id="collectingProgressCount" class="font-num text-sm font-bold text-teal-700">0 / 3</span>
-              </div>
-            </div>
-            <!-- 進捗バー -->
-            <div class="w-full bg-teal-100 h-1.5 rounded-full mt-2.5 overflow-hidden">
-              <div id="collectingProgressBar" class="bg-teal-600 h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+            <div class="flex items-center gap-1.5">
+              <!-- 学習ステータス表示 -->
+              <span id="learningStatusBadge" class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                学習中 ☆☆☆
+              </span>
+              <!-- 状態バッジ -->
+              <span id="predictionBadge" class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200">
+                計算中...
+              </span>
             </div>
           </div>
 
-          <!-- 【データ充足時】膀胱タンクゲージ + 予測時間帯レンジ -->
-          <div id="predictionResultView" class="hidden">
+          <!-- 【排尿記録0回時】初回ガイドビュー -->
+          <div id="noUrinationYetView" class="hidden my-1 py-3.5 px-4 rounded-xl bg-teal-50/70 border border-teal-100">
+            <p class="text-sm font-bold text-teal-900">
+              まずは1回目の排尿を記録してください
+            </p>
+            <p class="text-xs text-teal-700/90 mt-1 leading-relaxed">
+              設定された初期膀胱容量（<strong id="initialCapGuideText" class="font-num">350ml</strong>）と基礎生成速度（<strong id="initialRateGuideText" class="font-num">48ml/h</strong>）をもとに、直後から膀胱チャージ率と予測時間帯を表示します。
+            </p>
+          </div>
+
+          <!-- 【排尿記録あり】膀胱タンクゲージ + 予測時間帯レンジ -->
+          <div id="predictionResultView">
             <div class="flex items-center gap-4">
               <!-- 左側：膀胱タンクゲージ（0%〜100%） -->
               <div class="shrink-0 flex flex-col items-center">
@@ -165,13 +299,13 @@
                     </svg>
                   </div>
 
-                  <!-- 中央パーセント表示 -->
-                  <div class="relative z-20 text-center px-1 py-0.5 rounded-lg bg-white/85 backdrop-blur-[2px] shadow-xs border border-white/60">
-                    <span class="text-[9px] font-bold text-slate-500 block leading-none">推定量</span>
+                  <!-- 中央パーセント＆推定ml表示 -->
+                  <div class="relative z-20 text-center px-1.5 py-1 rounded-lg bg-white/90 backdrop-blur-[2px] shadow-xs border border-white/70">
                     <div class="flex items-baseline justify-center">
-                      <span id="bladderPercentText" class="font-num text-xl font-extrabold text-teal-700 leading-tight">0</span>
+                      <span id="bladderPercentText" class="font-num text-xl font-extrabold text-teal-700 leading-none">0</span>
                       <span id="bladderPercentUnit" class="font-num text-[11px] font-bold text-teal-700 ml-0.5">%</span>
                     </div>
+                    <span id="bladderEstimatedMlText" class="font-num text-[10px] font-bold text-slate-500 block mt-0.5 leading-none">0 / 350ml</span>
                   </div>
                 </div>
                 <span id="tankStatusCaption" class="text-[10px] font-bold text-teal-700 mt-1.5">余裕あり</span>
@@ -192,7 +326,7 @@
                   目安まで あと --分
                 </div>
 
-                <!-- 水分摂取スライド連動バッジ -->
+                <!-- 水分・カフェイン連動スライドバッジ -->
                 <div class="min-h-[22px] mt-1">
                   <span id="fluidAdjustmentBadge" class="hidden text-[11px] font-bold text-sky-700 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-md inline-flex items-center gap-1">
                     <svg class="w-3 h-3 text-sky-500 shrink-0" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
@@ -206,7 +340,7 @@
                 <div class="mt-2.5">
                   <div class="relative h-2.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200/70">
                     <!-- 予測時間帯ゾーン（レンジ帯） -->
-                    <div id="timelineRangeZone" class="absolute top-0 bottom-0 bg-amber-300/70 border-x border-amber-500/60 transition-all duration-500" style="left: 72%; width: 28%;"></div>
+                    <div id="timelineRangeZone" class="absolute top-0 bottom-0 bg-amber-300/75 border-x border-amber-500/60 transition-all duration-500" style="left: 72%; width: 28%;"></div>
                     <!-- 現在進行バー -->
                     <div id="timelineProgressFill" class="absolute top-0 bottom-0 left-0 bg-teal-500/85 rounded-l-full transition-all duration-700" style="width: 0%;"></div>
                   </div>
@@ -220,15 +354,15 @@
             </div>
           </div>
 
-          <!-- 平均間隔＆ロジック説明バー -->
-          <div class="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
+          <!-- 下部パラメータバー（学習済み膀胱容量＆尿生成速度） -->
+          <div class="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-600">
             <div class="flex items-center gap-1.5">
-              <svg class="w-4 h-4 text-teal-600 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <svg class="w-3.5 h-3.5 text-teal-600 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
               </svg>
-              <span>平均間隔: <strong id="avgIntervalText" class="text-slate-800 font-num">データ収集中</strong></span>
+              <span>学習容量: <strong id="learnedCapacityDisplay" class="text-slate-800 font-num">350ml</strong></span>
             </div>
-            <span id="predictionBasisText" class="text-[11px] text-slate-400">3回の記録後に予測開始</span>
+            <span id="generationRateDisplay" class="font-num text-slate-500">基礎生成: 48.0ml/h</span>
           </div>
         </div>
       </section>
@@ -238,7 +372,6 @@
         <div class="flex items-center justify-between mb-2.5">
           <h2 class="text-sm font-bold text-slate-700 flex items-center gap-1.5">
             <span>今すぐ記録する</span>
-            <span class="text-[11px] font-normal text-slate-400">（タップで量を選択）</span>
           </h2>
           <button id="openCustomModalBtn" type="button" class="tap-btn text-xs font-bold text-teal-700 hover:text-teal-800 bg-teal-50 hover:bg-teal-100 px-3 py-1.5 rounded-xl flex items-center gap-1 border border-teal-200/70">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
@@ -248,7 +381,7 @@
           </button>
         </div>
 
-        <!-- メインアクションボタン（排尿のみ・タップで量選択ポップアップ表示） -->
+        <!-- メインアクションボタン（排尿のみ・タップで学習用尿意レベル選択ポップアップ） -->
         <div class="bg-white p-3.5 rounded-2xl border border-teal-100 shadow-sm">
           <button id="openUrinationModalBtn" type="button" class="tap-btn w-full bg-teal-600 hover:bg-teal-700 text-white rounded-xl py-4 px-4 flex flex-col items-center justify-center shadow-sm">
             <div class="flex items-center gap-2">
@@ -257,20 +390,32 @@
               </svg>
               <span class="text-lg font-bold">排尿 (おしっこ)</span>
             </div>
-            <span class="text-xs text-teal-100 mt-1">タップして量を選択・タンクをリセット</span>
+            <span class="text-xs text-teal-100 mt-1">タップして尿意レベルを選択・タンクをリセット</span>
           </button>
         </div>
 
-        <!-- サブアクション（水分摂取プリセット・横幅フル表示） -->
+        <!-- サブアクション（水分摂取プリセット・カフェイン種別切替付き） -->
         <div class="mt-3 bg-white p-3.5 rounded-2xl border border-sky-100 shadow-sm">
-          <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center justify-between mb-2.5">
             <span class="text-xs font-bold text-sky-800 flex items-center gap-1">
               <svg class="w-4 h-4 text-sky-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23-.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0112 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23-.693L5 14.5" />
               </svg>
-              水分摂取 (タンク量＆予測レンジに連動)
+              水分摂取
             </span>
+
+            <!-- 飲料タイプ切替（カフェイン係数連動） -->
+            <div class="flex items-center bg-slate-100 p-0.5 rounded-lg text-[11px] font-bold">
+              <button type="button" id="drinkTypeNormalBtn" class="px-2.5 py-1 rounded-md bg-white text-sky-700 shadow-xs transition">
+                水・お茶
+              </button>
+              <button type="button" id="drinkTypeCaffeineBtn" class="px-2.5 py-1 rounded-md text-slate-500 hover:text-amber-700 transition flex items-center gap-1">
+                <span>コーヒー・緑茶</span>
+                <span id="caffeineFactorTag" class="font-num text-[10px] text-amber-600">×1.15</span>
+              </button>
+            </div>
           </div>
+
           <div class="grid grid-cols-3 gap-2">
             <button type="button" data-fluid="100" class="fluid-quick-btn tap-btn py-2.5 px-2 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200/70 flex flex-col items-center">
               <span class="font-num text-sm font-bold">100ml</span>
@@ -307,7 +452,7 @@
           </button>
         </div>
 
-        <!-- 本日の集計カード（排尿・水分摂取の2カラム） -->
+        <!-- 本日の集計カード -->
         <div class="grid grid-cols-2 gap-3 mb-4">
           <div class="bg-white rounded-2xl p-3.5 border border-slate-100 shadow-sm text-center">
             <span class="text-xs font-medium text-slate-500 block">本日の排尿</span>
@@ -332,26 +477,18 @@
       </section>
     </div>
 
-    <!-- フッター（デモ・データ管理ユーティリティ） -->
+    <!-- フッター -->
     <footer class="px-4 mt-10 pt-5 border-t border-slate-200/80 text-center">
-      <p class="text-[11px] text-slate-400 mb-3">
-        ※記録データはお使いの端末のブラウザ内に自動保存されます。
+      <p class="text-[11px] text-slate-400">
+        ※記録データと学習済み膀胱容量は端末のブラウザ内に自動保存されます。
       </p>
-      <div class="flex items-center justify-center gap-2.5">
-        <button id="loadSampleBtn" type="button" class="tap-btn text-xs font-medium text-slate-600 bg-white hover:bg-slate-100 px-3 py-2 rounded-xl border border-slate-200">
-          サンプルデータ読込
-        </button>
-        <button id="clearAllBtn" type="button" class="tap-btn text-xs font-medium text-rose-600 bg-rose-50 hover:bg-rose-100 px-3 py-2 rounded-xl border border-rose-200/70">
-          データ全消去
-        </button>
-      </div>
     </footer>
 
   </div>
 
-  <!-- ========================================== -->
-  <!-- モーダル0: 排尿量選択ポップアップ          -->
-  <!-- ========================================== -->
+  <!-- ============================================================ -->
+  <!-- モーダル0: 排尿時の尿意レベル選択（パーソナライズ学習連動）   -->
+  <!-- ============================================================ -->
   <div id="urinationAmountModal" class="hidden fixed inset-0 z-50 bg-slate-900/50 flex items-end sm:items-center justify-center p-0 sm:p-4">
     <div class="bg-white w-full max-w-[460px] rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl">
       <div class="flex items-center justify-between pb-3 border-b border-slate-100">
@@ -361,7 +498,10 @@
               <path d="M12 2.25c-5.385 5.385-8.25 9.18-8.25 12.75a8.25 8.25 0 1016.5 0c0-3.57-2.865-7.365-8.25-12.75z" />
             </svg>
           </span>
-          <h3 class="text-base font-bold text-slate-800">排尿の量を選択してください</h3>
+          <div>
+            <h3 class="text-base font-bold text-slate-800">排尿時の尿意レベルを選択</h3>
+            <p class="text-[11px] text-slate-500">「普通」「限界ギリギリ」の記録で膀胱容量を自動学習します</p>
+          </div>
         </div>
         <button id="closeUrinationModalXBtn" type="button" class="p-1.5 rounded-full text-slate-400 hover:bg-slate-100">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -371,17 +511,17 @@
       </div>
 
       <div class="grid grid-cols-3 gap-2.5 mt-4">
-        <button type="button" data-amount="少なめ" class="urination-amount-btn tap-btn py-4 px-2 rounded-2xl bg-teal-50 hover:bg-teal-100 text-teal-900 border border-teal-200 flex flex-col items-center justify-center gap-1">
-          <span class="text-base font-bold">少なめ</span>
-          <span class="text-[11px] text-teal-700/80">少量・ちょびっと</span>
+        <button type="button" data-level="念のため" class="urination-level-btn tap-btn py-4 px-2 rounded-2xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 flex flex-col items-center justify-center gap-1 text-center">
+          <span class="text-sm font-bold">念のため</span>
+          <span class="text-[10px] text-slate-500 leading-tight">外出前など<br>（学習から除外）</span>
         </button>
-        <button type="button" data-amount="普通" class="urination-amount-btn tap-btn py-4 px-2 rounded-2xl bg-teal-600 hover:bg-teal-700 text-white shadow-sm flex flex-col items-center justify-center gap-1">
+        <button type="button" data-level="普通" class="urination-level-btn tap-btn py-4 px-2 rounded-2xl bg-teal-600 hover:bg-teal-700 text-white shadow-sm flex flex-col items-center justify-center gap-1 text-center">
           <span class="text-base font-bold">普通</span>
-          <span class="text-[11px] text-teal-100">いつもの量</span>
+          <span class="text-[10px] text-teal-100 leading-tight">自然な尿意<br>（目標 80%学習）</span>
         </button>
-        <button type="button" data-amount="多め" class="urination-amount-btn tap-btn py-4 px-2 rounded-2xl bg-teal-50 hover:bg-teal-100 text-teal-900 border border-teal-200 flex flex-col items-center justify-center gap-1">
-          <span class="text-base font-bold">多め</span>
-          <span class="text-[11px] text-teal-700/80">しっかり出た</span>
+        <button type="button" data-level="限界ギリギリ" class="urination-level-btn tap-btn py-4 px-2 rounded-2xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 flex flex-col items-center justify-center gap-1 text-center">
+          <span class="text-sm font-bold">限界ギリギリ</span>
+          <span class="text-[10px] text-amber-700 leading-tight">かなり溜まった<br>（目標 95%学習）</span>
         </button>
       </div>
 
@@ -391,9 +531,9 @@
     </div>
   </div>
 
-  <!-- ========================================== -->
-  <!-- モーダル1: 時間指定記録 / 記録編集モーダル -->
-  <!-- ========================================== -->
+  <!-- ============================================================ -->
+  <!-- モーダル1: 時間指定記録 / 記録編集モーダル                    -->
+  <!-- ============================================================ -->
   <div id="entryModal" class="hidden fixed inset-0 z-50 bg-slate-900/50 flex items-end sm:items-center justify-center p-0 sm:p-4">
     <div class="bg-white w-full max-w-[460px] rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl">
       <div class="flex items-center justify-between pb-3 border-b border-slate-100">
@@ -408,7 +548,6 @@
       <form id="entryForm" class="mt-4 space-y-4">
         <input type="hidden" id="editEntryId" value="" />
 
-        <!-- 種別選択（排尿・水分の2種類） -->
         <div>
           <label class="block text-xs font-bold text-slate-600 mb-1.5">記録の種類</label>
           <div class="grid grid-cols-2 gap-2">
@@ -423,24 +562,29 @@
           </div>
         </div>
 
-        <!-- 日時入力 -->
         <div>
           <label for="entryDateTime" class="block text-xs font-bold text-slate-600 mb-1.5">記録日時</label>
           <input type="datetime-local" id="entryDateTime" required class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm font-num text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500" />
         </div>
 
-        <!-- 状態・量（種別に応じて切替） -->
-        <div id="detailSelectWrapper">
-          <label id="detailLabel" for="entryDetail" class="block text-xs font-bold text-slate-600 mb-1.5">量・状態</label>
+        <div>
+          <label id="detailLabel" for="entryDetail" class="block text-xs font-bold text-slate-600 mb-1.5">尿意レベル・量</label>
           <select id="entryDetail" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500">
             <!-- JSで動的生成 -->
           </select>
         </div>
 
-        <!-- メモ入力 -->
+        <!-- 水分選択時のみ表示：カフェイン有無 -->
+        <div id="entryCaffeineWrapper" class="hidden">
+          <label class="flex items-center gap-2.5 bg-amber-50/70 border border-amber-200/80 p-3 rounded-xl cursor-pointer">
+            <input type="checkbox" id="entryIsCaffeine" class="w-4 h-4 accent-amber-600 rounded" />
+            <span class="text-xs font-bold text-amber-900">カフェイン入り飲料（コーヒー・緑茶・紅茶など）</span>
+          </label>
+        </div>
+
         <div>
           <label for="entryNote" class="block text-xs font-bold text-slate-600 mb-1.5">メモ（任意）</label>
-          <input type="text" id="entryNote" placeholder="例：失禁なし、トイレ誘導成功、お茶など" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500" />
+          <input type="text" id="entryNote" placeholder="例：外出前、トイレ誘導成功など" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500" />
         </div>
 
         <div class="pt-2 flex gap-2.5">
@@ -455,13 +599,13 @@
     </div>
   </div>
 
-  <!-- ========================================== -->
-  <!-- モーダル2: 予測アルゴリズム設定モーダル -->
-  <!-- ========================================== -->
-  <div id="settingsModal" class="hidden fixed inset-0 z-50 bg-slate-900/50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-    <div class="bg-white w-full max-w-[460px] rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl">
+  <!-- ============================================================ -->
+  <!-- モーダル2: 設定編集＆初期化モーダル（歯車アイコンから開く）   -->
+  <!-- ============================================================ -->
+  <div id="settingsModal" class="hidden fixed inset-0 z-50 bg-slate-900/50 flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
+    <div class="bg-white w-full max-w-[460px] rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl max-h-[92vh] overflow-y-auto">
       <div class="flex items-center justify-between pb-3 border-b border-slate-100">
-        <h3 class="text-base font-bold text-slate-800">排尿予測の設定</h3>
+        <h3 class="text-base font-bold text-slate-800">ユーザー基本設定・学習モデル</h3>
         <button id="closeSettingsModalXBtn" type="button" class="p-1.5 rounded-full text-slate-400 hover:bg-slate-100">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -470,48 +614,78 @@
       </div>
 
       <form id="settingsForm" class="mt-4 space-y-4">
+        <!-- 1. 体重（kg） -->
         <div>
-          <label for="defaultIntervalInput" class="block text-xs font-bold text-slate-700 mb-1">
-            基本の排尿間隔（予備基準値）
-          </label>
-          <p class="text-[11px] text-slate-500 mb-2">3回の排尿記録が完了した後に、実測間隔またはこの基準値から予測を開始します。</p>
-          <select id="defaultIntervalInput" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 bg-white">
-            <option value="120">2時間 00分</option>
-            <option value="150">2時間 30分</option>
-            <option value="180" selected>3時間 00分（標準）</option>
-            <option value="210">3時間 30分</option>
-            <option value="240">4時間 00分</option>
+          <div class="flex items-center justify-between mb-1">
+            <label for="setWeightInput" class="text-xs font-bold text-slate-700">体重（kg）</label>
+            <span id="setBaseRatePreview" class="font-num text-[11px] font-bold text-teal-700">基礎生成: 48.0 ml/h</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <input type="number" id="setWeightInput" min="25" max="200" step="0.5" required class="w-full font-num text-base font-bold rounded-xl border border-slate-300 px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500" />
+            <span class="text-xs font-bold text-slate-600">kg</span>
+          </div>
+        </div>
+
+        <!-- 2. 現在の学習済み膀胱容量（直接編集＆頻度プリセット） -->
+        <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80">
+          <div class="flex items-center justify-between mb-1.5">
+            <label for="setCapacityInput" class="text-xs font-bold text-slate-800">現在の膀胱容量（学習値・直接編集可）</label>
+            <span id="setLearningCountLabel" class="text-[11px] font-bold text-indigo-700">学習回数: 0回</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <input type="number" id="setCapacityInput" min="100" max="1000" step="5" required class="w-full font-num text-base font-bold rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500" />
+            <span class="text-xs font-bold text-slate-600">ml</span>
+          </div>
+          <div class="mt-2">
+            <span class="text-[11px] text-slate-500 block mb-1">トイレ頻度プリセットから再セット：</span>
+            <div class="grid grid-cols-3 gap-1.5">
+              <button type="button" data-preset-cap="260" class="cap-preset-btn tap-btn py-1.5 px-2 rounded-lg bg-white hover:bg-teal-50 border border-slate-200 text-[11px] font-bold text-slate-700">近い (260ml)</button>
+              <button type="button" data-preset-cap="350" class="cap-preset-btn tap-btn py-1.5 px-2 rounded-lg bg-white hover:bg-teal-50 border border-slate-200 text-[11px] font-bold text-slate-700">普通 (350ml)</button>
+              <button type="button" data-preset-cap="430" class="cap-preset-btn tap-btn py-1.5 px-2 rounded-lg bg-white hover:bg-teal-50 border border-slate-200 text-[11px] font-bold text-slate-700">遠い (430ml)</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. カフェインへの敏感さ（係数） -->
+        <div>
+          <label for="setCaffeineSelect" class="block text-xs font-bold text-slate-700 mb-1">カフェインへの敏感さ（利尿係数）</label>
+          <select id="setCaffeineSelect" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 bg-white">
+            <option value="1.5">影響を受けやすい（係数 1.5倍）</option>
+            <option value="1.15">あまり変わらない（係数 1.15倍）</option>
           </select>
         </div>
 
-        <div class="flex items-center justify-between bg-slate-50 p-3.5 rounded-2xl border border-slate-200/70">
+        <!-- 夜間モード補正 -->
+        <div class="flex items-center justify-between bg-slate-50 p-3 rounded-2xl border border-slate-200/70">
           <div class="pr-3">
             <span class="text-xs font-bold text-slate-800 block">夜間モード自動補正（21時〜翌6時）</span>
-            <span class="text-[11px] text-slate-500">夜間は排尿間隔を約1.25倍長めに見積もります。</span>
+            <span class="text-[11px] text-slate-500">夜間は尿生成スピードを緩やかに見積もります。</span>
           </div>
           <input type="checkbox" id="nightModeToggle" checked class="w-5 h-5 accent-teal-600 rounded cursor-pointer" />
         </div>
 
-        <div class="flex items-center justify-between bg-slate-50 p-3.5 rounded-2xl border border-slate-200/70">
-          <div class="pr-3">
-            <span class="text-xs font-bold text-slate-800 block">水分摂取によるタンク・予測レンジ連動</span>
-            <span class="text-[11px] text-slate-500">水分記録後、タンクのチャージ率が増え、予測時間帯が手前へスライドします。</span>
-          </div>
-          <input type="checkbox" id="fluidAdjustToggle" checked class="w-5 h-5 accent-teal-600 rounded cursor-pointer" />
-        </div>
-
-        <div class="pt-2">
+        <div class="pt-1">
           <button type="submit" class="tap-btn w-full py-3 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold shadow-sm">
-            設定を適用する
+            変更を保存する
           </button>
         </div>
       </form>
+
+      <!-- 初期設定をやり直す（全データ初期化） -->
+      <div class="mt-6 pt-4 border-t border-slate-200">
+        <button id="resetAllToOnboardingBtn" type="button" class="tap-btn w-full py-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold flex items-center justify-center gap-1.5">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+          </svg>
+          <span>初期設定をやり直す（全データ初期化）</span>
+        </button>
+      </div>
     </div>
   </div>
 
-  <!-- ========================================== -->
-  <!-- モーダル3: 確認ダイアログ（alert/confirm代替） -->
-  <!-- ========================================== -->
+  <!-- ============================================================ -->
+  <!-- モーダル3: 確認ダイアログ（alert/confirm代替）                -->
+  <!-- ============================================================ -->
   <div id="confirmModal" class="hidden fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
     <div class="bg-white w-full max-w-[360px] rounded-3xl p-5 shadow-2xl text-center">
       <div class="w-12 h-12 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto mb-3">
@@ -535,99 +709,124 @@
   <!-- トースト通知エリア -->
   <div id="toastContainer" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 pointer-events-none flex flex-col items-center gap-2 w-full max-w-[420px] px-4"></div>
 
-  <!-- ========================================== -->
-  <!-- アプリケーション ロジック (JavaScript)     -->
-  <!-- ========================================== -->
+  <!-- ============================================================ -->
+  <!-- アプリケーション ロジック (JavaScript)                       -->
+  <!-- ============================================================ -->
   <script>
     /**
-     * ケア排尿ノート - 膀胱タンクゲージ＆予測時間帯レンジモデル
+     * ケア排尿ノート - オンボーディング + 生理学モデル + 指数移動平均学習(α=0.15)
      */
-    const STORAGE_KEY = 'care_urination_logs_v2';
-    const SETTINGS_KEY = 'care_urination_settings_v2';
-    const REQUIRED_URINATION_RECORDS = 3; // 予測表示に必要な排尿記録回数
+    const PROFILE_KEY = 'care_urination_user_profile_v3';
+    const LOGS_KEY = 'care_urination_logs_v3';
+    const EMA_LEARNING_RATE = 0.15; // 指数移動平均の学習率
 
-    // アプリケーション状態
+    // ユーザー基本設定＆学習状態（nullの場合は初回起動としてオンボーディングを表示）
+    let userProfile = null;
     let logs = [];
-    let settings = {
-      defaultIntervalMins: 180, // デフォルト3時間
-      nightMode: true,
-      fluidAdjust: true
-    };
+    let selectedDrinkIsCaffeine = false;
     let confirmCallback = null;
 
-    // 初期化処理
+    // 起動処理
     document.addEventListener('DOMContentLoaded', () => {
       try {
         setupEventListeners();
       } catch (e) {
         console.error('イベント初期化エラー:', e);
       }
-      loadSettings();
-      loadLogs();
-      updateHeaderDate();
-      renderAll();
 
-      // 15秒ごとにタンクチャージ率と予測レンジ表示をリアルタイム更新
+      loadUserProfile();
+      loadLogs();
+      checkInitialRoute();
+
+      // 15秒ごとに膀胱タンクゲージと予測時間帯レンジをリアルタイム更新
       setInterval(() => {
-        updateHeaderDate();
-        renderPredictionCard();
+        if (userProfile) {
+          updateHeaderDate();
+          renderPredictionCard();
+        }
       }, 15000);
     });
 
-    // ヘッダーの日付表示更新
-    function updateHeaderDate() {
-      const now = new Date();
-      const days = ['日', '月', '火', '水', '木', '金', '土'];
-      const month = now.getMonth() + 1;
-      const date = now.getDate();
-      const day = days[now.getDay()];
-      const el = document.getElementById('currentDateDisplay');
-      if (el) el.textContent = `${month}月${date}日 (${day})`;
+    // 初回起動判定（ユーザー基本設定の有無をチェック）
+    function checkInitialRoute() {
+      const obView = document.getElementById('onboardingView');
+      const mainView = document.getElementById('mainDashboardView');
+
+      if (!userProfile) {
+        // 初回起動：オンボーディング画面を表示
+        mainView.classList.add('hidden');
+        obView.classList.remove('hidden');
+        updateOnboardingRatePreview();
+      } else {
+        // 2回目以降：初期設定をスキップし、直接メインダッシュボードを表示
+        obView.classList.add('hidden');
+        mainView.classList.remove('hidden');
+        updateHeaderDate();
+        syncDrinkTypeUI();
+        renderAll();
+      }
     }
 
-    // 設定の読み込み・保存
-    function loadSettings() {
+    // プロファイルの読み込み・保存
+    function loadUserProfile() {
       try {
-        const saved = localStorage.getItem(SETTINGS_KEY);
-        if (saved) {
-          settings = { ...settings, ...JSON.parse(saved) };
+        const raw = localStorage.getItem(PROFILE_KEY);
+        if (!raw) {
+          userProfile = null;
+          return;
+        }
+        const parsed = JSON.parse(raw);
+        if (
+          parsed &&
+          typeof parsed.weightKg === 'number' &&
+          typeof parsed.bladderCapacityMl === 'number' &&
+          typeof parsed.caffeineFactor === 'number'
+        ) {
+          userProfile = {
+            weightKg: parsed.weightKg,
+            bladderCapacityMl: parsed.bladderCapacityMl,
+            caffeineFactor: parsed.caffeineFactor,
+            nightMode: parsed.nightMode !== undefined ? Boolean(parsed.nightMode) : true,
+            learningCount: Number(parsed.learningCount) || 0
+          };
+        } else {
+          userProfile = null;
         }
       } catch (e) {
-        console.error('設定の読み込みに失敗:', e);
+        console.error('プロファイル読込エラー:', e);
+        userProfile = null;
       }
-      document.getElementById('defaultIntervalInput').value = settings.defaultIntervalMins;
-      document.getElementById('nightModeToggle').checked = settings.nightMode;
-      document.getElementById('fluidAdjustToggle').checked = settings.fluidAdjust;
     }
 
-    function saveSettings() {
+    function saveUserProfile() {
       try {
-        localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+        localStorage.setItem(PROFILE_KEY, JSON.stringify(userProfile));
       } catch (e) {
-        console.error('設定の保存に失敗:', e);
+        console.error('プロファイル保存エラー:', e);
+        showToast('設定の保存に失敗しました', 'error');
       }
     }
 
-    // ログの読み込み
+    // ログの読み込み・保存
     function loadLogs() {
       try {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) {
-            logs = parsed.filter(item =>
-              item &&
-              (item.type === 'urination' || item.type === 'fluid') &&
-              item.timestamp
-            );
-          } else {
-            logs = [];
-          }
+        const raw = localStorage.getItem(LOGS_KEY);
+        if (!raw) {
+          logs = [];
+          return;
+        }
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          logs = parsed.filter(item =>
+            item &&
+            (item.type === 'urination' || item.type === 'fluid') &&
+            item.timestamp
+          );
         } else {
           logs = [];
         }
       } catch (e) {
-        console.error('記録の読み込みに失敗:', e);
+        console.error('ログ読込エラー:', e);
         logs = [];
       }
     }
@@ -635,237 +834,286 @@
     function saveLogs() {
       try {
         logs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(logs));
+        localStorage.setItem(LOGS_KEY, JSON.stringify(logs));
       } catch (e) {
-        console.error('記録の保存に失敗:', e);
-        showToast('データの保存に失敗しました', 'error');
+        console.error('ログ保存エラー:', e);
+        showToast('記録の保存に失敗しました', 'error');
       }
     }
 
-    // サンプルデータ生成（現在時刻を基準に今日の自然なケア記録を生成）
-    function createSampleLogs() {
+    // 基礎尿生成速度（ml/h）= 体重 × 0.8
+    function getBaseGenerationRateMlPerHour() {
+      if (!userProfile) return 48;
+      return userProfile.weightKg * 0.8;
+    }
+
+    // オンボーディング画面の基礎尿生成プレビュー更新
+    function updateOnboardingRatePreview() {
+      const w = parseFloat(document.getElementById('obWeightInput').value) || 60;
+      const rate = (w * 0.8).toFixed(1);
+      document.getElementById('obBaseRatePreview').textContent = `基礎生成: ${rate} ml/h`;
+    }
+
+    // ヘッダー日付更新
+    function updateHeaderDate() {
       const now = new Date();
-      const minsAgo = (m) => new Date(now.getTime() - m * 60000).toISOString();
-
-      return [
-        {
-          id: 'sample-1',
-          type: 'fluid',
-          timestamp: minsAgo(35),
-          detail: '150ml',
-          fluidAmount: 150,
-          note: 'お茶（コップ1杯）'
-        },
-        {
-          id: 'sample-2',
-          type: 'urination',
-          timestamp: minsAgo(110), // 1時間50分前
-          detail: '普通',
-          fluidAmount: 0,
-          note: 'トイレ誘導にて排尿'
-        },
-        {
-          id: 'sample-4',
-          type: 'urination',
-          timestamp: minsAgo(265), // 前回との間隔 = 2時間35分
-          detail: '多め',
-          fluidAmount: 0,
-          note: '起床後トイレ'
-        },
-        {
-          id: 'sample-5',
-          type: 'fluid',
-          timestamp: minsAgo(320),
-          detail: '200ml',
-          fluidAmount: 200,
-          note: '白湯'
-        },
-        {
-          id: 'sample-6',
-          type: 'urination',
-          timestamp: minsAgo(435), // 前回との間隔 = 2時間50分
-          detail: '普通',
-          fluidAmount: 0,
-          note: '起床時排尿'
-        }
-      ];
+      const days = ['日', '月', '火', '水', '木', '金', '土'];
+      document.getElementById('currentDateDisplay').textContent =
+        `${now.getMonth() + 1}月${now.getDate()}日 (${days[now.getDay()]})`;
     }
 
-    // 排尿量選択ポップアップ制御
-    function openUrinationAmountModal() {
-      document.getElementById('urinationAmountModal').classList.remove('hidden');
+    // 飲料タイプ切替UIの同期
+    function syncDrinkTypeUI() {
+      const normalBtn = document.getElementById('drinkTypeNormalBtn');
+      const cafBtn = document.getElementById('drinkTypeCaffeineBtn');
+      const factorTag = document.getElementById('caffeineFactorTag');
+
+      if (userProfile) {
+        factorTag.textContent = `×${userProfile.caffeineFactor}`;
+      }
+
+      if (!selectedDrinkIsCaffeine) {
+        normalBtn.className = 'px-2.5 py-1 rounded-md bg-white text-sky-700 shadow-xs transition';
+        cafBtn.className = 'px-2.5 py-1 rounded-md text-slate-500 hover:text-amber-700 transition flex items-center gap-1';
+      } else {
+        normalBtn.className = 'px-2.5 py-1 rounded-md text-slate-500 hover:text-sky-700 transition';
+        cafBtn.className = 'px-2.5 py-1 rounded-md bg-amber-500 text-white shadow-xs transition flex items-center gap-1';
+        factorTag.className = 'font-num text-[10px] text-amber-100';
+      }
     }
 
-    function closeUrinationAmountModal() {
-      document.getElementById('urinationAmountModal').classList.add('hidden');
-    }
-
-    function selectUrinationAmount(amountLabel) {
-      closeUrinationAmountModal();
-      quickLog('urination', amountLabel, 0);
-    }
-
-    // ワンタップ記録アクション
-    function quickLog(type, detail, fluidAmount = 0) {
-      const newEntry = {
-        id: 'log-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
-        type,
-        timestamp: new Date().toISOString(),
-        detail,
-        fluidAmount,
-        note: ''
-      };
-      logs.unshift(newEntry);
-      saveLogs();
-      renderAll();
-
-      const labelMap = {
-        urination: `排尿（${detail}）を記録し、タンクをリセットしました`,
-        fluid: `水分摂取（${detail}）を記録しました`
-      };
-      showToast(labelMap[type] || '記録しました');
-    }
-
-    // ==========================================
-    // 膀胱タンクチャージ率＆予測時間帯レンジ算出
-    // ==========================================
-    function calculatePrediction() {
+    // ============================================================
+    // 生理学的尿生成モデル ＆ パーソナライズ学習（EMA α=0.15）
+    // ============================================================
+    function calculateBladderState(referenceDate = new Date()) {
       const urinations = logs
         .filter(item => item.type === 'urination')
         .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
-      // 排尿記録が3回未満の場合は予測を非表示にする
-      if (urinations.length < REQUIRED_URINATION_RECORDS) {
-        const remainingRecords = REQUIRED_URINATION_RECORDS - urinations.length;
+      const capacity = userProfile.bladderCapacityMl;
+      const baseRate = getBaseGenerationRateMlPerHour();
+
+      if (urinations.length === 0) {
         return {
-          isReady: false,
-          remainingRecords,
-          currentCompleted: urinations.length,
-          requiredRecords: REQUIRED_URINATION_RECORDS
+          hasUrination: false,
+          estimatedMl: 0,
+          chargePercent: 0,
+          capacity,
+          baseRate
         };
       }
 
       const lastUrination = urinations[urinations.length - 1];
-      const lastUrinationDate = new Date(lastUrination.timestamp);
-      const now = new Date();
+      const lastDate = new Date(lastUrination.timestamp);
+      const elapsedHours = Math.max(0, (referenceDate - lastDate) / 3600000);
 
-      // 有効な排尿間隔（20分以上〜10時間以下）を抽出
-      const validIntervals = [];
-      for (let i = 1; i < urinations.length; i++) {
-        const diffMins = (new Date(urinations[i].timestamp) - new Date(urinations[i - 1].timestamp)) / 60000;
-        if (diffMins >= 20 && diffMins <= 600) {
-          validIntervals.push(diffMins);
-        }
+      // 夜間モード補正（21:00〜翌6:00は基礎尿生成速度を0.8倍に緩やか化）
+      const hour = referenceDate.getHours();
+      const isNight = userProfile.nightMode && (hour >= 21 || hour < 6);
+      const effectiveBaseRate = isNight ? baseRate * 0.8 : baseRate;
+
+      // 1. 基礎代謝による生成尿量 (ml)
+      const basalVolumeMl = elapsedHours * effectiveBaseRate;
+
+      // 2. 前回排尿以降の水分摂取による追加生成尿量 (ml)
+      // 摂取水分は吸収・濾過に約20〜90分かけて尿へ移行するモデル（カフェイン時は係数を乗算）
+      const fluidsSinceLast = logs.filter(item =>
+        item.type === 'fluid' &&
+        new Date(item.timestamp) > lastDate &&
+        new Date(item.timestamp) <= referenceDate
+      );
+
+      let fluidGeneratedMl = 0;
+      let totalFluidIntakeMl = 0;
+      let hasCaffeineIntake = false;
+
+      fluidsSinceLast.forEach(f => {
+        const intake = Number(f.fluidAmount) || 0;
+        totalFluidIntakeMl += intake;
+        const minsSinceDrink = Math.max(0, (referenceDate - new Date(f.timestamp)) / 60000);
+        // 摂取後15分から徐々に移行し、75分で吸収ピーク（摂取量の約65%が尿移行分として寄与）
+        const absorptionProgress = Math.min(1, Math.max(0.15, (minsSinceDrink + 15) / 90));
+        const multiplier = f.isCaffeine ? userProfile.caffeineFactor : 1.0;
+        if (f.isCaffeine) hasCaffeineIntake = true;
+
+        fluidGeneratedMl += intake * 0.65 * absorptionProgress * multiplier;
+      });
+
+      const estimatedMl = Math.max(0, basalVolumeMl + fluidGeneratedMl);
+      const chargePercent = Math.min(100, Math.max(0, Math.round((estimatedMl / capacity) * 100)));
+
+      // 3. 今後の尿生成速度（ml/h）を予測し、満タン(100%)到達時刻を逆算
+      // 未吸収の残余水分がある場合は直近1時間の生成速度へ加算
+      let unabsorbedFutureMl = 0;
+      fluidsSinceLast.forEach(f => {
+        const intake = Number(f.fluidAmount) || 0;
+        const minsSinceDrink = Math.max(0, (referenceDate - new Date(f.timestamp)) / 60000);
+        const remainingRatio = Math.max(0, 1 - (minsSinceDrink + 15) / 90);
+        const multiplier = f.isCaffeine ? userProfile.caffeineFactor : 1.0;
+        unabsorbedFutureMl += intake * 0.65 * remainingRatio * multiplier;
+      });
+
+      const remainingCapacityMl = Math.max(0, capacity - estimatedMl);
+      // 残り容量から未吸収分の将来移行量を差し引いた分を基礎生成速度で割る
+      const netRemainingMl = remainingCapacityMl - unabsorbedFutureMl;
+      let hoursToFull = 0;
+      if (netRemainingMl <= 0) {
+        // すでに摂取済みの水分移行だけで満タンに達する場合
+        hoursToFull = Math.max(0, (remainingCapacityMl / Math.max(1, unabsorbedFutureMl)) * 0.75);
+      } else {
+        const futureBoostHours = unabsorbedFutureMl > 0 ? 0.75 : 0;
+        hoursToFull = futureBoostHours + (netRemainingMl / Math.max(10, effectiveBaseRate));
       }
 
-      // 1. ベース平均間隔を算出
-      let avgIntervalMins = settings.defaultIntervalMins;
-      let basisText = `基本間隔(${formatDuration(settings.defaultIntervalMins)})から算出`;
+      // 目標排尿タイミング（膀胱容量の約88%到達を中心目安とする）
+      const targetFillRatio = 0.88;
+      const targetMl = capacity * targetFillRatio;
+      const deltaToTargetMl = targetMl - estimatedMl;
+      let minsToCenter = 0;
 
-      if (validIntervals.length > 0) {
-        const recentIntervals = validIntervals.slice(-5);
-        const sum = recentIntervals.reduce((acc, v) => acc + v, 0);
-        avgIntervalMins = Math.round(sum / recentIntervals.length);
-        basisText = `直近${recentIntervals.length}区間の平均から算出`;
+      if (deltaToTargetMl >= 0) {
+        const effectiveHourlyRate = effectiveBaseRate + (unabsorbedFutureMl / 1.2);
+        minsToCenter = Math.round((deltaToTargetMl / Math.max(10, effectiveHourlyRate)) * 60);
+      } else {
+        // すでに88%を超えている場合
+        const excessMl = Math.abs(deltaToTargetMl);
+        minsToCenter = -Math.round((excessMl / Math.max(10, effectiveBaseRate)) * 60);
       }
 
-      // 2. 夜間モード補正（21:00〜翌6:00の間は間隔を1.25倍に調整）
-      let effectiveIntervalMins = avgIntervalMins;
-      const currentHour = now.getHours();
-      const isNight = currentHour >= 21 || currentHour < 6;
-      if (settings.nightMode && isNight) {
-        effectiveIntervalMins = Math.round(effectiveIntervalMins * 1.25);
-        basisText += '・夜間補正中';
-      }
+      const centerPredictedDate = new Date(referenceDate.getTime() + minsToCenter * 60000);
 
-      // 3. 前回排尿以降の水分摂取量に応じた前倒し＆チャージ増加補正
-      let fluidReducedMins = 0;
-      let totalFluidSinceLast = 0;
-      if (settings.fluidAdjust) {
-        const fluidsSinceLast = logs.filter(item =>
-          item.type === 'fluid' && new Date(item.timestamp) > lastUrinationDate
-        );
-        totalFluidSinceLast = fluidsSinceLast.reduce((sum, f) => sum + (Number(f.fluidAmount) || 0), 0);
-
-        if (totalFluidSinceLast > 0) {
-          // 100mlあたり約12分前倒し（最大45分まで）
-          fluidReducedMins = Math.min(45, Math.round((totalFluidSinceLast / 100) * 12));
-          effectiveIntervalMins = Math.max(40, effectiveIntervalMins - fluidReducedMins);
-        }
-      }
-
-      // 4. 膀胱タンクの推定チャージ率（0%〜100%）の計算
-      // 経過時間割合 + 水分摂取による即時チャージ加算（100mlあたり約5%加算）
-      const elapsedMins = Math.max(0, (now - lastUrinationDate) / 60000);
-      const timeChargeRatio = elapsedMins / effectiveIntervalMins;
-      const fluidInstantBonus = settings.fluidAdjust ? (totalFluidSinceLast / 100) * 0.04 : 0;
-      const rawPercent = Math.round((timeChargeRatio + fluidInstantBonus) * 100);
-      const chargePercent = Math.min(100, Math.max(0, rawPercent));
-
-      // 5. 予測時間帯レンジの算出（中心時刻の前後 ±20〜25分、約45分幅）
-      const centerPredictedDate = new Date(lastUrinationDate.getTime() + effectiveIntervalMins * 60000);
-      const halfSpreadMins = Math.min(25, Math.max(15, Math.round(effectiveIntervalMins * 0.14)));
-
+      // 予測時間帯レンジ（±20〜25分の幅を持たせる）
+      const halfSpreadMins = 22;
       const rangeStartDate = new Date(centerPredictedDate.getTime() - halfSpreadMins * 60000);
       const rangeEndDate = new Date(centerPredictedDate.getTime() + halfSpreadMins * 60000);
 
-      // タイムラインバー用の進捗率（前回排尿 〜 予測レンジ終了までを100%とした場合の現在地）
-      const totalSpanMins = Math.max(1, (rangeEndDate - lastUrinationDate) / 60000);
-      const rangeStartRatio = Math.min(95, Math.max(10, Math.round(((rangeStartDate - lastUrinationDate) / 60000 / totalSpanMins) * 100)));
+      // タイムラインバー割合計算
+      const totalSpanMins = Math.max(1, (rangeEndDate - lastDate) / 60000);
+      const elapsedMins = Math.max(0, (referenceDate - lastDate) / 60000);
+      const rangeStartRatio = Math.min(92, Math.max(15, Math.round(((rangeStartDate - lastDate) / 60000 / totalSpanMins) * 100)));
       const currentProgressRatio = Math.min(100, Math.max(0, Math.round((elapsedMins / totalSpanMins) * 100)));
 
       return {
-        isReady: true,
+        hasUrination: true,
+        estimatedMl: Math.round(estimatedMl),
         chargePercent,
-        centerPredictedDate,
+        capacity: Math.round(capacity),
+        baseRate,
+        lastDate,
         rangeStartDate,
         rangeEndDate,
-        avgIntervalMins,
-        lastUrinationDate,
-        fluidReducedMins,
-        totalFluidSinceLast,
+        totalFluidIntakeMl,
+        hasCaffeineIntake,
         rangeStartRatio,
-        currentProgressRatio,
-        basisText
+        currentProgressRatio
       };
     }
 
+    // パーソナライズ学習の実行（指数移動平均 α = 0.15）
+    function applyPersonalizedLearning(urgencyLevel, timestampDate) {
+      // 「念のため」は学習から除外
+      if (urgencyLevel !== '普通' && urgencyLevel !== '限界ギリギリ') {
+        return null;
+      }
+
+      // その排尿直前時点の推定尿量を計算
+      const stateAtRecord = calculateBladderState(timestampDate);
+      if (!stateAtRecord.hasUrination || stateAtRecord.estimatedMl < 40) {
+        // 初回記録や極端に短時間（40ml未満）の誤タップはノイズ防止のため学習スキップ
+        return null;
+      }
+
+      const targetRatio = urgencyLevel === '普通' ? 0.80 : 0.95;
+      const estimatedMl = stateAtRecord.estimatedMl;
+
+      // 逆算された理想の膀胱容量（極端な外れ値を防ぐため 120ml〜900ml にクランプ）
+      const impliedCapacity = Math.min(900, Math.max(120, estimatedMl / targetRatio));
+      const oldCapacity = userProfile.bladderCapacityMl;
+
+      // 指数移動平均（学習率 0.15）
+      const newCapacity = Math.round(
+        oldCapacity * (1 - EMA_LEARNING_RATE) + impliedCapacity * EMA_LEARNING_RATE
+      );
+
+      userProfile.bladderCapacityMl = newCapacity;
+      userProfile.learningCount = (userProfile.learningCount || 0) + 1;
+      saveUserProfile();
+
+      return {
+        oldCapacity: Math.round(oldCapacity),
+        newCapacity,
+        estimatedMl,
+        targetPercent: Math.round(targetRatio * 100)
+      };
+    }
+
+    // 学習ステータスのラベル生成（例：学習中 ★★☆）
+    function getLearningStatusInfo() {
+      const count = userProfile ? (userProfile.learningCount || 0) : 0;
+      if (count === 0) {
+        return {
+          text: '初期設定 ☆☆☆',
+          className: 'text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200'
+        };
+      }
+      if (count <= 2) {
+        return {
+          text: '学習中 ★☆☆',
+          className: 'text-[11px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200'
+        };
+      }
+      if (count <= 5) {
+        return {
+          text: '学習中 ★★☆',
+          className: 'text-[11px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200'
+        };
+      }
+      return {
+        text: '最適化済 ★★★',
+        className: 'text-[11px] font-bold px-2 py-0.5 rounded-full bg-teal-50 text-teal-800 border border-teal-200'
+      };
+    }
+
+    // ============================================================
     // 予測カード（膀胱タンクゲージ＆予測時間帯レンジ）のUI描画
+    // ============================================================
     function renderPredictionCard() {
-      const pred = calculatePrediction();
+      if (!userProfile) return;
+
+      const state = calculateBladderState(new Date());
       const now = new Date();
 
-      const collectingView = document.getElementById('collectingDataView');
+      // 学習ステータスバッジ更新
+      const learnInfo = getLearningStatusInfo();
+      const learnBadge = document.getElementById('learningStatusBadge');
+      learnBadge.textContent = learnInfo.text;
+      learnBadge.className = learnInfo.className;
+
+      // 下部バー情報更新
+      document.getElementById('learnedCapacityDisplay').textContent = `${Math.round(userProfile.bladderCapacityMl)}ml`;
+      document.getElementById('generationRateDisplay').textContent = `基礎生成: ${getBaseGenerationRateMlPerHour().toFixed(1)}ml/h`;
+
+      const noUrinationView = document.getElementById('noUrinationYetView');
       const resultView = document.getElementById('predictionResultView');
       const badgeEl = document.getElementById('predictionBadge');
       const pulseDot = document.getElementById('predictionPulseDot');
 
-      if (!pred.isReady) {
-        collectingView.classList.remove('hidden');
+      if (!state.hasUrination) {
+        noUrinationView.classList.remove('hidden');
         resultView.classList.add('hidden');
+        document.getElementById('initialCapGuideText').textContent = `${Math.round(userProfile.bladderCapacityMl)}ml`;
+        document.getElementById('initialRateGuideText').textContent = `${getBaseGenerationRateMlPerHour().toFixed(1)}ml/h`;
 
-        badgeEl.textContent = 'データ収集中';
-        badgeEl.className = 'text-xs font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200';
-        pulseDot.className = 'w-2 h-2 rounded-full bg-amber-400 animate-pulse';
-
-        document.getElementById('remainingRecordsText').textContent =
-          `あと ${pred.remainingRecords} 回排尿を記録してください。`;
-        document.getElementById('collectingProgressCount').textContent =
-          `${pred.currentCompleted} / ${pred.requiredRecords} 回`;
-
-        const percent = Math.round((pred.currentCompleted / pred.requiredRecords) * 100);
-        document.getElementById('collectingProgressBar').style.width = `${percent}%`;
-
-        document.getElementById('avgIntervalText').textContent = 'データ収集中';
-        document.getElementById('predictionBasisText').textContent = `あと${pred.remainingRecords}回の記録後に予測表示`;
+        badgeEl.textContent = '待機中';
+        badgeEl.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200';
+        pulseDot.className = 'w-2 h-2 rounded-full bg-slate-400';
         return;
       }
 
-      // データ充足時：タンクゲージ＆予測レンジを描画
-      collectingView.classList.add('hidden');
+      noUrinationView.classList.add('hidden');
       resultView.classList.remove('hidden');
 
-      const pct = pred.chargePercent;
+      const pct = state.chargePercent;
 
       // 1. 膀胱タンクゲージの高さ＆色分け（70%未満：青・緑系 / 70〜89%：黄・オレンジ / 90%以上：赤）
       const tankShell = document.getElementById('bladderTankShell');
@@ -873,24 +1121,26 @@
       const tankWave = document.getElementById('bladderTankWave');
       const pctText = document.getElementById('bladderPercentText');
       const pctUnit = document.getElementById('bladderPercentUnit');
+      const mlSubText = document.getElementById('bladderEstimatedMlText');
       const tankCaption = document.getElementById('tankStatusCaption');
       const countdownEl = document.getElementById('countdownText');
 
       tankLiquid.style.height = `${pct}%`;
       pctText.textContent = pct;
+      mlSubText.textContent = `${state.estimatedMl}/${state.capacity}ml`;
 
       if (pct >= 90) {
         // 90%以上：警告色（赤）
         tankShell.className = 'relative w-20 h-28 rounded-2xl border-2 border-rose-300 bg-rose-50/40 overflow-hidden shadow-inner flex items-center justify-center';
         tankLiquid.className = 'tank-liquid absolute bottom-0 inset-x-0 bg-rose-500';
         tankWave.setAttribute('class', 'tank-wave absolute -top-2.5 left-0 h-3 text-rose-500 transition-colors duration-500');
-        pctText.className = 'font-num text-xl font-extrabold text-rose-600 leading-tight';
+        pctText.className = 'font-num text-xl font-extrabold text-rose-600 leading-none';
         pctUnit.className = 'font-num text-[11px] font-bold text-rose-600 ml-0.5';
         tankCaption.textContent = '警告・トイレ推奨';
         tankCaption.className = 'text-[10px] font-bold text-rose-600 mt-1.5';
 
         badgeEl.textContent = 'トイレ誘導推奨';
-        badgeEl.className = 'text-xs font-bold px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-300';
+        badgeEl.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-300';
         pulseDot.className = 'w-2 h-2 rounded-full bg-rose-500 animate-ping';
         countdownEl.className = 'font-num text-sm font-bold text-rose-600 mt-0.5';
       } else if (pct >= 70) {
@@ -898,13 +1148,13 @@
         tankShell.className = 'relative w-20 h-28 rounded-2xl border-2 border-amber-300 bg-amber-50/40 overflow-hidden shadow-inner flex items-center justify-center';
         tankLiquid.className = 'tank-liquid absolute bottom-0 inset-x-0 bg-amber-400';
         tankWave.setAttribute('class', 'tank-wave absolute -top-2.5 left-0 h-3 text-amber-400 transition-colors duration-500');
-        pctText.className = 'font-num text-xl font-extrabold text-amber-600 leading-tight';
+        pctText.className = 'font-num text-xl font-extrabold text-amber-600 leading-none';
         pctUnit.className = 'font-num text-[11px] font-bold text-amber-600 ml-0.5';
         tankCaption.textContent = '注意・そろそろ';
         tankCaption.className = 'text-[10px] font-bold text-amber-600 mt-1.5';
 
         badgeEl.textContent = 'そろそろ目安';
-        badgeEl.className = 'text-xs font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-300';
+        badgeEl.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-300';
         pulseDot.className = 'w-2 h-2 rounded-full bg-amber-500 animate-pulse';
         countdownEl.className = 'font-num text-sm font-bold text-amber-600 mt-0.5';
       } else {
@@ -912,24 +1162,23 @@
         tankShell.className = 'relative w-20 h-28 rounded-2xl border-2 border-teal-200 bg-teal-50/30 overflow-hidden shadow-inner flex items-center justify-center';
         tankLiquid.className = 'tank-liquid absolute bottom-0 inset-x-0 bg-teal-500';
         tankWave.setAttribute('class', 'tank-wave absolute -top-2.5 left-0 h-3 text-teal-500 transition-colors duration-500');
-        pctText.className = 'font-num text-xl font-extrabold text-teal-700 leading-tight';
+        pctText.className = 'font-num text-xl font-extrabold text-teal-700 leading-none';
         pctUnit.className = 'font-num text-[11px] font-bold text-teal-700 ml-0.5';
         tankCaption.textContent = '余裕あり';
         tankCaption.className = 'text-[10px] font-bold text-teal-700 mt-1.5';
 
         badgeEl.textContent = '余裕あり';
-        badgeEl.className = 'text-xs font-bold px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200';
+        badgeEl.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200';
         pulseDot.className = 'w-2 h-2 rounded-full bg-teal-500 animate-pulse';
         countdownEl.className = 'font-num text-sm font-bold text-teal-700 mt-0.5';
       }
 
       // 2. 予測時間帯レンジの描画（例：14:15 〜 15:00）
-      document.getElementById('predictedRangeStart').textContent = formatTime(pred.rangeStartDate);
-      document.getElementById('predictedRangeEnd').textContent = formatTime(pred.rangeEndDate);
+      document.getElementById('predictedRangeStart').textContent = formatTime(state.rangeStartDate);
+      document.getElementById('predictedRangeEnd').textContent = formatTime(state.rangeEndDate);
 
-      // カウントダウン文言
-      const minsToStart = Math.round((pred.rangeStartDate - now) / 60000);
-      const minsToEnd = Math.round((pred.rangeEndDate - now) / 60000);
+      const minsToStart = Math.round((state.rangeStartDate - now) / 60000);
+      const minsToEnd = Math.round((state.rangeEndDate - now) / 60000);
 
       if (minsToStart > 0) {
         countdownEl.textContent = `目安時間帯まで あと ${formatDuration(minsToStart)}`;
@@ -939,11 +1188,12 @@
         countdownEl.textContent = `予測時間帯を ${formatDuration(Math.abs(minsToEnd))} 経過`;
       }
 
-      // 水分摂取によるスライド連動バッジ
+      // 水分・カフェイン連動スライドバッジ
       const fluidBadge = document.getElementById('fluidAdjustmentBadge');
       const fluidText = document.getElementById('fluidAdjustmentText');
-      if (pred.fluidReducedMins > 0) {
-        fluidText.textContent = `水分${pred.totalFluidSinceLast}ml摂取で${pred.fluidReducedMins}分前倒し中`;
+      if (state.totalFluidIntakeMl > 0) {
+        const cafNote = state.hasCaffeineIntake ? `（カフェイン×${userProfile.caffeineFactor}反映）` : '';
+        fluidText.textContent = `水分${state.totalFluidIntakeMl}ml反映中${cafNote}`;
         fluidBadge.classList.remove('hidden');
       } else {
         fluidBadge.classList.add('hidden');
@@ -952,9 +1202,9 @@
       // タイムラインバーの更新
       const rangeZone = document.getElementById('timelineRangeZone');
       const progressFill = document.getElementById('timelineProgressFill');
-      rangeZone.style.left = `${pred.rangeStartRatio}%`;
-      rangeZone.style.width = `${100 - pred.rangeStartRatio}%`;
-      progressFill.style.width = `${pred.currentProgressRatio}%`;
+      rangeZone.style.left = `${state.rangeStartRatio}%`;
+      rangeZone.style.width = `${100 - state.rangeStartRatio}%`;
+      progressFill.style.width = `${state.currentProgressRatio}%`;
 
       if (pct >= 90) {
         progressFill.className = 'absolute top-0 bottom-0 left-0 bg-rose-500/85 rounded-l-full transition-all duration-700';
@@ -964,12 +1214,8 @@
         progressFill.className = 'absolute top-0 bottom-0 left-0 bg-teal-500/85 rounded-l-full transition-all duration-700';
       }
 
-      document.getElementById('timelineLastLabel').textContent = `前回 ${formatTime(pred.lastUrinationDate)}`;
-      document.getElementById('timelineEndLabel').textContent = formatTime(pred.rangeEndDate);
-
-      // 下部バー情報
-      document.getElementById('avgIntervalText').textContent = `約 ${formatDuration(pred.avgIntervalMins)}`;
-      document.getElementById('predictionBasisText').textContent = pred.basisText;
+      document.getElementById('timelineLastLabel').textContent = `前回 ${formatTime(state.lastDate)}`;
+      document.getElementById('timelineEndLabel').textContent = formatTime(state.rangeEndDate);
     }
 
     // 全体の再描画
@@ -979,7 +1225,7 @@
       renderTimeline();
     }
 
-    // 本日のサマリー集計の描画
+    // 本日のサマリー描画
     function renderSummary() {
       const todayKey = getDateKey(new Date());
       const todayLogs = logs.filter(item => getDateKey(new Date(item.timestamp)) === todayKey);
@@ -993,7 +1239,7 @@
       document.getElementById('todayFluidTotal').textContent = fluidTotal;
     }
 
-    // 履歴タイムラインの描画
+    // 履歴タイムライン描画
     function renderTimeline() {
       const container = document.getElementById('timelineContainer');
       const visibleLogs = logs.filter(item => item.type === 'urination' || item.type === 'fluid');
@@ -1052,7 +1298,7 @@
         `;
 
         groups[dateKey].forEach(item => {
-          const meta = getTypeVisualMeta(item.type);
+          const meta = getTypeVisualMeta(item);
           const timeStr = formatTime(new Date(item.timestamp));
           const intervalBadge = intervalMap[item.id]
             ? `<span class="text-[11px] font-medium text-teal-700 bg-teal-50 px-2 py-0.5 rounded-md border border-teal-100">前回から ${intervalMap[item.id]}</span>`
@@ -1071,6 +1317,7 @@
                   <div class="flex flex-wrap items-center gap-1.5">
                     <span class="text-sm font-bold text-slate-800">${meta.label}</span>
                     ${item.detail ? `<span class="text-xs font-bold px-2 py-0.5 rounded-md ${meta.badgeClass}">${escapeHtml(item.detail)}</span>` : ''}
+                    ${item.isCaffeine ? `<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">カフェイン</span>` : ''}
                     ${intervalBadge}
                   </div>
                   ${item.note ? `<p class="text-xs text-slate-500 mt-1 truncate">${escapeHtml(item.note)}</p>` : ''}
@@ -1099,14 +1346,18 @@
       container.innerHTML = html;
     }
 
-    // 種別ごとの見た目定義
-    function getTypeVisualMeta(type) {
-      if (type === 'urination') {
+    function getTypeVisualMeta(item) {
+      if (item.type === 'urination') {
+        const badgeColor = item.detail === '限界ギリギリ'
+          ? 'bg-amber-100 text-amber-800'
+          : item.detail === '念のため'
+            ? 'bg-slate-100 text-slate-700'
+            : 'bg-teal-100/80 text-teal-800';
         return {
           label: '排尿',
           bgClass: 'bg-teal-50',
           textClass: 'text-teal-600',
-          badgeClass: 'bg-teal-100/80 text-teal-800',
+          badgeClass: badgeColor,
           iconSvg: '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.25c-5.385 5.385-8.25 9.18-8.25 12.75a8.25 8.25 0 1016.5 0c0-3.57-2.865-7.365-8.25-12.75z" /></svg>'
         };
       }
@@ -1119,14 +1370,71 @@
       };
     }
 
-    // ==========================================
-    // モーダル制御（新規時間指定・編集・設定・確認）
-    // ==========================================
+    // ============================================================
+    // 記録アクション＆モーダル制御
+    // ============================================================
+    function openUrinationAmountModal() {
+      document.getElementById('urinationAmountModal').classList.remove('hidden');
+    }
+
+    function closeUrinationAmountModal() {
+      document.getElementById('urinationAmountModal').classList.add('hidden');
+    }
+
+    function recordUrinationWithLevel(urgencyLevel) {
+      closeUrinationAmountModal();
+      const now = new Date();
+
+      // 1. 記録保存前に、この時点の推定尿量からパーソナライズ学習（EMA α=0.15）を実行
+      const learnResult = applyPersonalizedLearning(urgencyLevel, now);
+
+      // 2. 排尿ログを追加
+      logs.unshift({
+        id: 'log-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+        type: 'urination',
+        timestamp: now.toISOString(),
+        detail: urgencyLevel,
+        fluidAmount: 0,
+        isCaffeine: false,
+        note: ''
+      });
+
+      saveLogs();
+      renderAll();
+
+      if (learnResult) {
+        showToast(`排尿を記録｜膀胱容量を学習補正しました（${learnResult.oldCapacity}ml → ${learnResult.newCapacity}ml）`);
+      } else {
+        showToast(`排尿（${urgencyLevel}）を記録し、タンクをリセットしました`);
+      }
+    }
+
+    function quickFluidLog(ml) {
+      const now = new Date();
+      const isCaffeine = selectedDrinkIsCaffeine;
+      logs.unshift({
+        id: 'log-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+        type: 'fluid',
+        timestamp: now.toISOString(),
+        detail: `${ml}ml`,
+        fluidAmount: ml,
+        isCaffeine,
+        note: isCaffeine ? 'カフェイン飲料' : ''
+      });
+      saveLogs();
+      renderAll();
+
+      const cafMsg = isCaffeine ? `（カフェイン係数×${userProfile.caffeineFactor}適用）` : '';
+      showToast(`水分 ${ml}ml を記録しました${cafMsg}`);
+    }
+
+    // 時間指定記録・編集モーダル
     function openCustomModal() {
       document.getElementById('entryModalTitle').textContent = '時間を指定して記録';
       document.getElementById('editEntryId').value = '';
       document.querySelector('input[name="entryType"][value="urination"]').checked = true;
       document.getElementById('entryDateTime').value = toLocalDateTimeInputString(new Date());
+      document.getElementById('entryIsCaffeine').checked = false;
       document.getElementById('entryNote').value = '';
       updateModalDetailOptions();
       document.getElementById('entryModal').classList.remove('hidden');
@@ -1143,6 +1451,7 @@
 
       document.getElementById('entryDateTime').value = toLocalDateTimeInputString(new Date(entry.timestamp));
       updateModalDetailOptions(entry.detail);
+      document.getElementById('entryIsCaffeine').checked = Boolean(entry.isCaffeine);
       document.getElementById('entryNote').value = entry.note || '';
       document.getElementById('entryModal').classList.remove('hidden');
     }
@@ -1156,19 +1465,34 @@
       const type = checkedRadio ? checkedRadio.value : 'urination';
       const selectEl = document.getElementById('entryDetail');
       const labelEl = document.getElementById('detailLabel');
+      const cafWrapper = document.getElementById('entryCaffeineWrapper');
 
       let options = [];
       if (type === 'urination') {
-        labelEl.textContent = '排尿の量';
-        options = ['普通', '少なめ', '多め'];
+        labelEl.textContent = '排尿時の尿意レベル';
+        options = ['普通', '念のため', '限界ギリギリ'];
+        cafWrapper.classList.add('hidden');
       } else {
-        labelEl.textContent = '摂取量';
+        labelEl.textContent = '水分摂取量';
         options = ['50ml', '100ml', '150ml', '200ml', '250ml', '300ml'];
+        cafWrapper.classList.remove('hidden');
       }
 
       selectEl.innerHTML = options.map(opt =>
         `<option value="${opt}" ${opt === selectedValue ? 'selected' : ''}>${opt}</option>`
       ).join('');
+    }
+
+    // 設定モーダルを開く（現在のプロファイルをフォームへ反映）
+    function openSettingsModal() {
+      if (!userProfile) return;
+      document.getElementById('setWeightInput').value = userProfile.weightKg;
+      document.getElementById('setBaseRatePreview').textContent = `基礎生成: ${(userProfile.weightKg * 0.8).toFixed(1)} ml/h`;
+      document.getElementById('setCapacityInput').value = Math.round(userProfile.bladderCapacityMl);
+      document.getElementById('setLearningCountLabel').textContent = `学習回数: ${userProfile.learningCount || 0}回`;
+      document.getElementById('setCaffeineSelect').value = String(userProfile.caffeineFactor);
+      document.getElementById('nightModeToggle').checked = userProfile.nightMode;
+      document.getElementById('settingsModal').classList.remove('hidden');
     }
 
     function closeSettingsModal() {
@@ -1200,9 +1524,7 @@
       );
     }
 
-    // ==========================================
-    // CSVエクスポート（医師・ケアマネ提出用 排尿日誌）
-    // ==========================================
+    // CSV出力
     function exportToCsv() {
       const targetLogs = logs.filter(item => item.type === 'urination' || item.type === 'fluid');
       if (targetLogs.length === 0) {
@@ -1211,13 +1533,8 @@
       }
 
       const sorted = [...targetLogs].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-      const typeNameMap = {
-        urination: '排尿',
-        fluid: '水分摂取'
-      };
-
       const rows = [
-        ['日付', '時刻', '記録種別', '量・状態', '水分量(ml)', '前回排尿からの間隔', 'メモ']
+        ['日付', '時刻', '記録種別', '尿意レベル・量', '水分量(ml)', 'カフェイン', '前回排尿からの間隔', 'メモ']
       ];
 
       let prevUrination = null;
@@ -1238,9 +1555,10 @@
         rows.push([
           dateStr,
           timeStr,
-          typeNameMap[item.type] || item.type,
+          item.type === 'urination' ? '排尿' : '水分摂取',
           item.detail || '',
           item.type === 'fluid' ? (item.fluidAmount || 0) : '',
+          item.type === 'fluid' ? (item.isCaffeine ? 'あり' : 'なし') : '',
           intervalStr,
           (item.note || '').replace(/"/g, '""')
         ]);
@@ -1267,34 +1585,70 @@
       showToast('排尿日誌CSVをダウンロードしました');
     }
 
+    // ============================================================
     // イベントリスナー登録
+    // ============================================================
     function setupEventListeners() {
-      document.getElementById('openUrinationModalBtn').addEventListener('click', openUrinationAmountModal);
+      // オンボーディング：体重入力のリアルタイム計算プレビュー
+      document.getElementById('obWeightInput').addEventListener('input', updateOnboardingRatePreview);
 
-      document.querySelectorAll('.urination-amount-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const amount = btn.getAttribute('data-amount');
-          selectUrinationAmount(amount);
-        });
+      // オンボーディング完了送信
+      document.getElementById('onboardingForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const weightKg = parseFloat(document.getElementById('obWeightInput').value) || 60;
+        const freqRadio = document.querySelector('input[name="obFrequency"]:checked');
+        const cafRadio = document.querySelector('input[name="obCaffeine"]:checked');
+
+        const bladderCapacityMl = freqRadio ? parseInt(freqRadio.value, 10) : 350;
+        const caffeineFactor = cafRadio ? parseFloat(cafRadio.value) : 1.15;
+
+        userProfile = {
+          weightKg,
+          bladderCapacityMl,
+          caffeineFactor,
+          nightMode: true,
+          learningCount: 0
+        };
+        saveUserProfile();
+        checkInitialRoute();
+        showToast('初期設定を完了しました！');
       });
 
+      // メイン画面：排尿モーダル開閉
+      document.getElementById('openUrinationModalBtn').addEventListener('click', openUrinationAmountModal);
+      document.querySelectorAll('.urination-level-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          recordUrinationWithLevel(btn.getAttribute('data-level'));
+        });
+      });
       document.getElementById('closeUrinationModalXBtn').addEventListener('click', closeUrinationAmountModal);
       document.getElementById('closeUrinationModalCancelBtn').addEventListener('click', closeUrinationAmountModal);
       document.getElementById('urinationAmountModal').addEventListener('click', (e) => {
         if (e.target.id === 'urinationAmountModal') closeUrinationAmountModal();
       });
 
+      // 飲料タイプ切替（水・お茶 vs カフェイン飲料）
+      document.getElementById('drinkTypeNormalBtn').addEventListener('click', () => {
+        selectedDrinkIsCaffeine = false;
+        syncDrinkTypeUI();
+      });
+      document.getElementById('drinkTypeCaffeineBtn').addEventListener('click', () => {
+        selectedDrinkIsCaffeine = true;
+        syncDrinkTypeUI();
+      });
+
+      // 水分クイックボタン
       document.querySelectorAll('.fluid-quick-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           const ml = parseInt(btn.getAttribute('data-fluid'), 10);
-          quickLog('fluid', `${ml}ml`, ml);
+          quickFluidLog(ml);
         });
       });
 
+      // 時間指定記録・編集モーダル
       document.getElementById('openCustomModalBtn').addEventListener('click', openCustomModal);
       document.getElementById('closeEntryModalXBtn').addEventListener('click', closeEntryModal);
       document.getElementById('closeEntryModalCancelBtn').addEventListener('click', closeEntryModal);
-
       document.querySelectorAll('input[name="entryType"]').forEach(radio => {
         radio.addEventListener('change', () => updateModalDetailOptions());
       });
@@ -1305,24 +1659,30 @@
         const type = document.querySelector('input[name="entryType"]:checked').value;
         const dateTimeVal = document.getElementById('entryDateTime').value;
         const detail = document.getElementById('entryDetail').value;
+        const isCaffeine = type === 'fluid' ? document.getElementById('entryIsCaffeine').checked : false;
         const note = document.getElementById('entryNote').value.trim();
 
-        const timestamp = new Date(dateTimeVal).toISOString();
+        const recordDate = new Date(dateTimeVal);
+        const timestamp = recordDate.toISOString();
         const fluidAmount = type === 'fluid' ? parseInt(detail.replace(/[^0-9]/g, ''), 10) || 0 : 0;
 
         if (editId) {
           const idx = logs.findIndex(item => item.id === editId);
           if (idx !== -1) {
-            logs[idx] = { ...logs[idx], type, timestamp, detail, fluidAmount, note };
+            logs[idx] = { ...logs[idx], type, timestamp, detail, fluidAmount, isCaffeine, note };
           }
           showToast('記録を更新しました');
         } else {
+          if (type === 'urination') {
+            applyPersonalizedLearning(detail, recordDate);
+          }
           logs.unshift({
             id: 'log-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
             type,
             timestamp,
             detail,
             fluidAmount,
+            isCaffeine,
             note
           });
           showToast('指定時間で記録を保存しました');
@@ -1333,6 +1693,7 @@
         closeEntryModal();
       });
 
+      // タイムライン内の編集・削除
       document.getElementById('timelineContainer').addEventListener('click', (e) => {
         const editBtn = e.target.closest('.edit-entry-btn');
         if (editBtn) {
@@ -1345,22 +1706,60 @@
         }
       });
 
-      document.getElementById('openSettingsBtn').addEventListener('click', () => {
-        document.getElementById('settingsModal').classList.remove('hidden');
-      });
+      // 設定モーダル開閉＆フォーム処理
+      document.getElementById('openSettingsBtn').addEventListener('click', openSettingsModal);
       document.getElementById('closeSettingsModalXBtn').addEventListener('click', closeSettingsModal);
+
+      document.getElementById('setWeightInput').addEventListener('input', () => {
+        const w = parseFloat(document.getElementById('setWeightInput').value) || 60;
+        document.getElementById('setBaseRatePreview').textContent = `基礎生成: ${(w * 0.8).toFixed(1)} ml/h`;
+      });
+
+      document.querySelectorAll('.cap-preset-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.getElementById('setCapacityInput').value = btn.getAttribute('data-preset-cap');
+        });
+      });
 
       document.getElementById('settingsForm').addEventListener('submit', (e) => {
         e.preventDefault();
-        settings.defaultIntervalMins = parseInt(document.getElementById('defaultIntervalInput').value, 10) || 180;
-        settings.nightMode = document.getElementById('nightModeToggle').checked;
-        settings.fluidAdjust = document.getElementById('fluidAdjustToggle').checked;
-        saveSettings();
-        renderPredictionCard();
+        const weightKg = parseFloat(document.getElementById('setWeightInput').value) || 60;
+        const bladderCapacityMl = parseInt(document.getElementById('setCapacityInput').value, 10) || 350;
+        const caffeineFactor = parseFloat(document.getElementById('setCaffeineSelect').value) || 1.15;
+        const nightMode = document.getElementById('nightModeToggle').checked;
+
+        userProfile = {
+          ...userProfile,
+          weightKg,
+          bladderCapacityMl,
+          caffeineFactor,
+          nightMode
+        };
+        saveUserProfile();
+        syncDrinkTypeUI();
+        renderAll();
         closeSettingsModal();
-        showToast('予測設定を保存しました');
+        showToast('設定を保存しました');
       });
 
+      // 初期設定をやり直す（全データ初期化）
+      document.getElementById('resetAllToOnboardingBtn').addEventListener('click', () => {
+        openConfirmModal(
+          '初期設定をやり直す（全データ初期化）',
+          'ユーザー設定・学習済み膀胱容量・すべての排尿記録を削除し、最初の初期設定画面に戻ります。よろしいですか？',
+          () => {
+            localStorage.removeItem(PROFILE_KEY);
+            localStorage.removeItem(LOGS_KEY);
+            userProfile = null;
+            logs = [];
+            closeSettingsModal();
+            checkInitialRoute();
+            showToast('全データを初期化しました');
+          }
+        );
+      });
+
+      // 確認モーダル制御
       document.getElementById('confirmCancelBtn').addEventListener('click', closeConfirmModal);
       document.getElementById('confirmOkBtn').addEventListener('click', () => {
         if (typeof confirmCallback === 'function') {
@@ -1369,38 +1768,13 @@
         closeConfirmModal();
       });
 
+      // CSV出力
       document.getElementById('exportCsvBtn').addEventListener('click', exportToCsv);
-
-      document.getElementById('loadSampleBtn').addEventListener('click', () => {
-        openConfirmModal(
-          'サンプルデータの読込',
-          '現在の記録をサンプルデータに置き換えますか？',
-          () => {
-            logs = createSampleLogs();
-            saveLogs();
-            renderAll();
-            showToast('サンプルデータを読み込みました');
-          }
-        );
-      });
-
-      document.getElementById('clearAllBtn').addEventListener('click', () => {
-        openConfirmModal(
-          'データの全消去',
-          '保存されているすべての記録を削除します。この操作は元に戻せません。',
-          () => {
-            logs = [];
-            saveLogs();
-            renderAll();
-            showToast('すべてのデータを消去しました');
-          }
-        );
-      });
     }
 
-    // ==========================================
+    // ============================================================
     // ユーティリティ関数群
-    // ==========================================
+    // ============================================================
     function formatTime(date) {
       const h = String(date.getHours()).padStart(2, '0');
       const m = String(date.getMinutes()).padStart(2, '0');
@@ -1460,7 +1834,7 @@
         toast.style.opacity = '0';
         toast.style.transition = 'opacity 0.25s ease';
         setTimeout(() => toast.remove(), 250);
-      }, 2400);
+      }, 2800);
     }
   </script>
 </body>

@@ -177,44 +177,34 @@
                   <span id="tankStatusCaption" class="text-[10px] font-bold text-teal-700 mt-1.5">余裕あり</span>
                 </div>
 
-                <!-- 右側：予測時間帯レンジ＆タイムライン -->
+                <!-- 右側：予測時間帯レンジ -->
                 <div class="flex-1 min-w-0">
                   <div class="text-xs font-bold text-slate-500">次のトイレ目安時間帯</div>
                   <!-- レンジ表示（例：14:15 〜 15:00） -->
-                  <div class="mt-0.5 flex items-baseline flex-wrap gap-1">
+                  <div class="mt-1 flex items-baseline flex-wrap gap-1">
                     <span id="predictedRangeStart" class="font-num text-2xl sm:text-[26px] font-extrabold text-slate-900 tracking-tight">--:--</span>
                     <span class="text-sm font-bold text-slate-400">〜</span>
                     <span id="predictedRangeEnd" class="font-num text-2xl sm:text-[26px] font-extrabold text-slate-900 tracking-tight">--:--</span>
                   </div>
 
                   <!-- カウントダウン目安 -->
-                  <div id="countdownText" class="font-num text-sm font-bold text-teal-700 mt-0.5">
+                  <div id="countdownText" class="font-num text-sm font-bold text-teal-700 mt-1">
                     目安まで あと --分
                   </div>
 
+                  <!-- 前回排尿時刻 -->
+                  <p id="lastUrinationInfo" class="text-xs text-slate-500 font-num mt-1">
+                    前回排尿: --:--
+                  </p>
+
                   <!-- 水分摂取スライド連動バッジ -->
-                  <div class="min-h-[22px] mt-1">
+                  <div class="mt-2">
                     <span id="fluidAdjustmentBadge" class="hidden text-[11px] font-bold text-sky-700 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-md inline-flex items-center gap-1">
                       <svg class="w-3 h-3 text-sky-500 shrink-0" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
                       </svg>
                       <span id="fluidAdjustmentText">水分摂取により前倒し中</span>
                     </span>
-                  </div>
-
-                  <!-- 視覚的タイムラインバー（前回排尿 → 現在 → 予測レンジ） -->
-                  <div class="mt-2.5">
-                    <div class="relative h-2.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200/70">
-                      <!-- 予測時間帯ゾーン（レンジ帯） -->
-                      <div id="timelineRangeZone" class="absolute top-0 bottom-0 bg-amber-300/70 border-x border-amber-500/60 transition-all duration-500" style="left: 72%; width: 28%;"></div>
-                      <!-- 現在進行バー -->
-                      <div id="timelineProgressFill" class="absolute top-0 bottom-0 left-0 bg-teal-500/85 rounded-l-full transition-all duration-700" style="width: 0%;"></div>
-                    </div>
-                    <div class="flex items-center justify-between text-[10px] font-num text-slate-400 mt-1">
-                      <span id="timelineLastLabel">前回 --:--</span>
-                      <span class="text-amber-700 font-sans font-bold">予測レンジ帯</span>
-                      <span id="timelineEndLabel">--:--</span>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -706,12 +696,10 @@
     function switchTab(tabName) {
       activeTab = tabName;
 
-      // ビュー表示切替
       document.getElementById('tabViewRecord').classList.toggle('hidden', tabName !== 'record');
       document.getElementById('tabViewStats').classList.toggle('hidden', tabName !== 'stats');
       document.getElementById('tabViewSettings').classList.toggle('hidden', tabName !== 'settings');
 
-      // ヘッダー右上ラベル更新
       const subtitleMap = {
         record: '記録・予測',
         stats: '統計・分析',
@@ -719,7 +707,6 @@
       };
       document.getElementById('headerTabSubtitle').textContent = subtitleMap[tabName] || '記録・予測';
 
-      // 下部ナビゲーションボタンのアクティブ状態更新
       document.querySelectorAll('.nav-tab-btn').forEach(btn => {
         const isTarget = btn.getAttribute('data-tab') === tabName;
         if (isTarget) {
@@ -729,7 +716,6 @@
         }
       });
 
-      // タブ表示時に最新データを描画
       if (tabName === 'stats') {
         renderStatsView();
       } else if (tabName === 'record') {
@@ -807,7 +793,7 @@
       }
     }
 
-    // サンプルデータ生成（過去数日分の統計も確認できるよう複数日分を生成）
+    // サンプルデータ生成
     function createSampleLogs() {
       const now = new Date();
       const minsAgo = (m) => new Date(now.getTime() - m * 60000).toISOString();
@@ -817,13 +803,11 @@
       };
 
       return [
-        // 今日の記録
         { id: 's-1', type: 'fluid', timestamp: minsAgo(35), detail: '150ml', fluidAmount: 150, note: 'お茶（コップ1杯）' },
         { id: 's-2', type: 'urination', timestamp: minsAgo(110), detail: '普通', fluidAmount: 0, note: 'トイレ誘導にて排尿' },
         { id: 's-3', type: 'urination', timestamp: minsAgo(265), detail: '多め', fluidAmount: 0, note: '午前トイレ' },
         { id: 's-4', type: 'fluid', timestamp: minsAgo(320), detail: '200ml', fluidAmount: 200, note: '白湯' },
         { id: 's-5', type: 'urination', timestamp: minsAgo(435), detail: '普通', fluidAmount: 0, note: '起床時排尿' },
-        // 昨日の記録
         { id: 's-6', type: 'urination', timestamp: dayHour(1, 21, 15), detail: '普通', fluidAmount: 0, note: '就寝前' },
         { id: 's-7', type: 'fluid', timestamp: dayHour(1, 19, 0), detail: '150ml', fluidAmount: 150, note: '夕食時お茶' },
         { id: 's-8', type: 'urination', timestamp: dayHour(1, 17, 40), detail: '普通', fluidAmount: 0, note: '' },
@@ -832,7 +816,6 @@
         { id: 's-11', type: 'urination', timestamp: dayHour(1, 10, 50), detail: '少なめ', fluidAmount: 0, note: '' },
         { id: 's-12', type: 'fluid', timestamp: dayHour(1, 8, 30), detail: '200ml', fluidAmount: 200, note: '朝食時' },
         { id: 's-13', type: 'urination', timestamp: dayHour(1, 7, 20), detail: '多め', fluidAmount: 0, note: '起床時' },
-        // 一昨日の記録
         { id: 's-14', type: 'urination', timestamp: dayHour(2, 20, 30), detail: '普通', fluidAmount: 0, note: '' },
         { id: 's-15', type: 'fluid', timestamp: dayHour(2, 16, 0), detail: '150ml', fluidAmount: 150, note: '' },
         { id: 's-16', type: 'urination', timestamp: dayHour(2, 16, 45), detail: '普通', fluidAmount: 0, note: '' },
@@ -951,10 +934,6 @@
       const rangeStartDate = new Date(centerPredictedDate.getTime() - halfSpreadMins * 60000);
       const rangeEndDate = new Date(centerPredictedDate.getTime() + halfSpreadMins * 60000);
 
-      const totalSpanMins = Math.max(1, (rangeEndDate - lastUrinationDate) / 60000);
-      const rangeStartRatio = Math.min(95, Math.max(10, Math.round(((rangeStartDate - lastUrinationDate) / 60000 / totalSpanMins) * 100)));
-      const currentProgressRatio = Math.min(100, Math.max(0, Math.round((elapsedMins / totalSpanMins) * 100)));
-
       return {
         isReady: true,
         chargePercent,
@@ -965,8 +944,6 @@
         lastUrinationDate,
         fluidReducedMins,
         totalFluidSinceLast,
-        rangeStartRatio,
-        currentProgressRatio,
         basisText
       };
     }
@@ -1029,7 +1006,7 @@
         badgeEl.textContent = 'トイレ誘導推奨';
         badgeEl.className = 'text-xs font-bold px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-300';
         pulseDot.className = 'w-2 h-2 rounded-full bg-rose-500 animate-ping';
-        countdownEl.className = 'font-num text-sm font-bold text-rose-600 mt-0.5';
+        countdownEl.className = 'font-num text-sm font-bold text-rose-600 mt-1';
       } else if (pct >= 70) {
         tankShell.className = 'relative w-20 h-28 rounded-2xl border-2 border-amber-300 bg-amber-50/40 overflow-hidden shadow-inner flex items-center justify-center';
         tankLiquid.className = 'tank-liquid absolute bottom-0 inset-x-0 bg-amber-400';
@@ -1042,7 +1019,7 @@
         badgeEl.textContent = 'そろそろ目安';
         badgeEl.className = 'text-xs font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-300';
         pulseDot.className = 'w-2 h-2 rounded-full bg-amber-500 animate-pulse';
-        countdownEl.className = 'font-num text-sm font-bold text-amber-600 mt-0.5';
+        countdownEl.className = 'font-num text-sm font-bold text-amber-600 mt-1';
       } else {
         tankShell.className = 'relative w-20 h-28 rounded-2xl border-2 border-teal-200 bg-teal-50/30 overflow-hidden shadow-inner flex items-center justify-center';
         tankLiquid.className = 'tank-liquid absolute bottom-0 inset-x-0 bg-teal-500';
@@ -1055,11 +1032,12 @@
         badgeEl.textContent = '余裕あり';
         badgeEl.className = 'text-xs font-bold px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200';
         pulseDot.className = 'w-2 h-2 rounded-full bg-teal-500 animate-pulse';
-        countdownEl.className = 'font-num text-sm font-bold text-teal-700 mt-0.5';
+        countdownEl.className = 'font-num text-sm font-bold text-teal-700 mt-1';
       }
 
       document.getElementById('predictedRangeStart').textContent = formatTime(pred.rangeStartDate);
       document.getElementById('predictedRangeEnd').textContent = formatTime(pred.rangeEndDate);
+      document.getElementById('lastUrinationInfo').textContent = `前回排尿: ${formatTime(pred.lastUrinationDate)}`;
 
       const minsToStart = Math.round((pred.rangeStartDate - now) / 60000);
       const minsToEnd = Math.round((pred.rangeEndDate - now) / 60000);
@@ -1080,23 +1058,6 @@
       } else {
         fluidBadge.classList.add('hidden');
       }
-
-      const rangeZone = document.getElementById('timelineRangeZone');
-      const progressFill = document.getElementById('timelineProgressFill');
-      rangeZone.style.left = `${pred.rangeStartRatio}%`;
-      rangeZone.style.width = `${100 - pred.rangeStartRatio}%`;
-      progressFill.style.width = `${pred.currentProgressRatio}%`;
-
-      if (pct >= 90) {
-        progressFill.className = 'absolute top-0 bottom-0 left-0 bg-rose-500/85 rounded-l-full transition-all duration-700';
-      } else if (pct >= 70) {
-        progressFill.className = 'absolute top-0 bottom-0 left-0 bg-amber-500/85 rounded-l-full transition-all duration-700';
-      } else {
-        progressFill.className = 'absolute top-0 bottom-0 left-0 bg-teal-500/85 rounded-l-full transition-all duration-700';
-      }
-
-      document.getElementById('timelineLastLabel').textContent = `前回 ${formatTime(pred.lastUrinationDate)}`;
-      document.getElementById('timelineEndLabel').textContent = formatTime(pred.rangeEndDate);
 
       document.getElementById('avgIntervalText').textContent = `約 ${formatDuration(pred.avgIntervalMins)}`;
       document.getElementById('predictionBasisText').textContent = pred.basisText;
@@ -1133,7 +1094,6 @@
       const urinations = logs.filter(i => i.type === 'urination');
       const fluids = logs.filter(i => i.type === 'fluid');
 
-      // 1. 過去7日間の日付キーリストを生成（古い順）
       const daysList = [];
       const now = new Date();
       for (let i = 6; i >= 0; i--) {
@@ -1158,7 +1118,6 @@
         if (dayMap[k]) dayMap[k].fluidTotal += (Number(f.fluidAmount) || 0);
       });
 
-      // 記録が1件以上ある日だけで1日平均を算出
       const activeDays = daysList.filter(d => d.urinationCount > 0 || d.fluidTotal > 0);
       if (activeDays.length > 0) {
         const avgU = (activeDays.reduce((s, d) => s + d.urinationCount, 0) / activeDays.length).toFixed(1);
@@ -1170,7 +1129,6 @@
         document.getElementById('statAvgFluidPerDay').textContent = '0';
       }
 
-      // 平均排尿間隔（全有効区間）
       const sortedU = [...urinations].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
       const intervals = [];
       for (let i = 1; i < sortedU.length; i++) {
@@ -1184,7 +1142,6 @@
         document.getElementById('statAvgInterval').textContent = '計測待ち';
       }
 
-      // 2. 日別推移グラフ描画（過去7日間）
       const maxU = Math.max(8, ...daysList.map(d => d.urinationCount));
       const maxF = Math.max(1000, ...daysList.map(d => d.fluidTotal));
       const dailyChartEl = document.getElementById('dailyChartContainer');
@@ -1209,7 +1166,6 @@
         </div>
       `;
 
-      // 3. 時間帯別の排尿傾向（4区分）
       const buckets = [
         { label: '早朝・朝（06:00〜11:59）', count: 0 },
         { label: '昼・午後（12:00〜17:59）', count: 0 },
@@ -1245,7 +1201,6 @@
         }).join('');
       }
 
-      // 4. 排尿量の内訳（少なめ・普通・多め）
       const counts = { '少なめ': 0, '普通': 0, '多め': 0 };
       urinations.forEach(u => {
         if (counts[u.detail] !== undefined) counts[u.detail]++;
@@ -1556,7 +1511,6 @@
 
     // イベントリスナー登録
     function setupEventListeners() {
-      // 下部ナビゲーションタブ切替
       document.querySelectorAll('.nav-tab-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           switchTab(btn.getAttribute('data-tab'));
@@ -1639,7 +1593,6 @@
         }
       });
 
-      // 設定タブ内フォーム保存
       document.getElementById('settingsForm').addEventListener('submit', (e) => {
         e.preventDefault();
         settings.defaultIntervalMins = parseInt(document.getElementById('defaultIntervalInput').value, 10) || 180;
@@ -1658,12 +1611,10 @@
         closeConfirmModal();
       });
 
-      // CSV出力（記録タブ・設定タブ共通）
       document.querySelectorAll('.export-csv-trigger').forEach(btn => {
         btn.addEventListener('click', exportToCsv);
       });
 
-      // サンプルデータ読込
       document.getElementById('loadSampleBtn').addEventListener('click', () => {
         openConfirmModal(
           'サンプルデータの読込',
@@ -1677,7 +1628,6 @@
         );
       });
 
-      // データ全消去
       document.getElementById('clearAllBtn').addEventListener('click', () => {
         openConfirmModal(
           'データの全消去',

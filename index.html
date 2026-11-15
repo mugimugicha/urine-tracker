@@ -9,7 +9,7 @@
   <!-- Google Fonts: Noto Sans JP & Inter -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
   <script>
     tailwind.config = {
       theme: {
@@ -62,6 +62,19 @@
     .toast-enter {
       animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
+
+    /* 膀胱タンクの液体波アニメーション */
+    @keyframes waveFlow {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+    .tank-liquid {
+      transition: height 0.7s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.5s ease;
+    }
+    .tank-wave {
+      width: 200%;
+      animation: waveFlow 4s linear infinite;
+    }
   </style>
 </head>
 <body class="font-sans text-slate-800 antialiased selection:bg-teal-100">
@@ -97,13 +110,13 @@
         </div>
       </header>
 
-      <!-- 1. 次回排尿予測カード -->
+      <!-- 1. 膀胱タンクゲージ＆次回排尿予測レンジカード -->
       <section class="px-4 -mt-3">
-        <div class="bg-white rounded-2xl shadow-md border border-slate-100 p-5">
-          <div class="flex items-center justify-between mb-2">
+        <div class="bg-white rounded-2xl shadow-md border border-slate-100 p-4 sm:p-5">
+          <div class="flex items-center justify-between mb-3">
             <span class="text-xs font-bold text-slate-500 flex items-center gap-1.5">
               <span id="predictionPulseDot" class="w-2 h-2 rounded-full bg-teal-500 animate-pulse"></span>
-              次回の排尿予測タイミング
+              膀胱チャージ状況＆次回目安
             </span>
             <!-- ステータスバッジ -->
             <span id="predictionBadge" class="text-xs font-bold px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200">
@@ -112,7 +125,7 @@
           </div>
 
           <!-- 【データ不足時】データ収集案内ビュー -->
-          <div id="collectingDataView" class="my-2 py-2.5 px-3.5 rounded-xl bg-teal-50/70 border border-teal-100">
+          <div id="collectingDataView" class="my-1 py-3 px-3.5 rounded-xl bg-teal-50/70 border border-teal-100">
             <div class="flex items-center justify-between gap-2">
               <div>
                 <p id="remainingRecordsText" class="text-base font-bold text-teal-900">
@@ -133,21 +146,77 @@
             </div>
           </div>
 
-          <!-- 【データ充足時】メイン予測時刻＆カウントダウン -->
-          <div id="predictionResultView" class="hidden flex items-baseline justify-between my-2">
-            <div>
-              <div class="flex items-baseline gap-1">
-                <span id="predictedTimeText" class="font-num text-4xl font-bold text-slate-900 tracking-tight">--:--</span>
-                <span class="text-base font-bold text-slate-600">頃</span>
-              </div>
-              <p id="lastUrinationInfo" class="text-xs text-slate-500 mt-1">前回排尿: --:--</p>
-            </div>
+          <!-- 【データ充足時】膀胱タンクゲージ + 予測時間帯レンジ -->
+          <div id="predictionResultView" class="hidden">
+            <div class="flex items-center gap-4">
+              <!-- 左側：膀胱タンクゲージ（0%〜100%） -->
+              <div class="shrink-0 flex flex-col items-center">
+                <div id="bladderTankShell" class="relative w-20 h-28 rounded-2xl border-2 border-teal-200 bg-slate-50 overflow-hidden shadow-inner flex items-center justify-center">
+                  <!-- 目盛り線 -->
+                  <div class="absolute inset-x-0 top-[10%] border-t border-dashed border-rose-300/70 z-10 pointer-events-none"></div>
+                  <div class="absolute inset-x-0 top-[30%] border-t border-dashed border-amber-300/70 z-10 pointer-events-none"></div>
+                  <div class="absolute inset-x-0 top-[60%] border-t border-dashed border-slate-300/60 z-10 pointer-events-none"></div>
 
-            <div class="text-right">
-              <div id="countdownText" class="font-num text-xl font-bold text-teal-700">あと --分</div>
-              <p id="fluidAdjustmentBadge" class="hidden text-[11px] font-medium text-sky-600 bg-sky-50 px-2 py-0.5 rounded-md mt-1 inline-block">
-                水分摂取により前倒し中
-              </p>
+                  <!-- 液体本体 -->
+                  <div id="bladderTankLiquid" class="tank-liquid absolute bottom-0 inset-x-0 bg-teal-500" style="height: 0%;">
+                    <!-- 水面の波SVG -->
+                    <svg id="bladderTankWave" class="tank-wave absolute -top-2.5 left-0 h-3 text-teal-500 transition-colors duration-500" viewBox="0 0 120 12" preserveAspectRatio="none">
+                      <path d="M0,6 Q15,0 30,6 T60,6 T90,6 T120,6 L120,12 L0,12 Z" fill="currentColor"></path>
+                    </svg>
+                  </div>
+
+                  <!-- 中央パーセント表示 -->
+                  <div class="relative z-20 text-center px-1 py-0.5 rounded-lg bg-white/85 backdrop-blur-[2px] shadow-xs border border-white/60">
+                    <span class="text-[9px] font-bold text-slate-500 block leading-none">推定量</span>
+                    <div class="flex items-baseline justify-center">
+                      <span id="bladderPercentText" class="font-num text-xl font-extrabold text-teal-700 leading-tight">0</span>
+                      <span id="bladderPercentUnit" class="font-num text-[11px] font-bold text-teal-700 ml-0.5">%</span>
+                    </div>
+                  </div>
+                </div>
+                <span id="tankStatusCaption" class="text-[10px] font-bold text-teal-700 mt-1.5">余裕あり</span>
+              </div>
+
+              <!-- 右側：予測時間帯レンジ＆タイムライン -->
+              <div class="flex-1 min-w-0">
+                <div class="text-xs font-bold text-slate-500">次のトイレ目安時間帯</div>
+                <!-- レンジ表示（例：14:15 〜 15:00） -->
+                <div class="mt-0.5 flex items-baseline flex-wrap gap-1">
+                  <span id="predictedRangeStart" class="font-num text-2xl sm:text-[26px] font-extrabold text-slate-900 tracking-tight">--:--</span>
+                  <span class="text-sm font-bold text-slate-400">〜</span>
+                  <span id="predictedRangeEnd" class="font-num text-2xl sm:text-[26px] font-extrabold text-slate-900 tracking-tight">--:--</span>
+                </div>
+
+                <!-- カウントダウン目安 -->
+                <div id="countdownText" class="font-num text-sm font-bold text-teal-700 mt-0.5">
+                  目安まで あと --分
+                </div>
+
+                <!-- 水分摂取スライド連動バッジ -->
+                <div class="min-h-[22px] mt-1">
+                  <span id="fluidAdjustmentBadge" class="hidden text-[11px] font-bold text-sky-700 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-md inline-flex items-center gap-1">
+                    <svg class="w-3 h-3 text-sky-500 shrink-0" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                    </svg>
+                    <span id="fluidAdjustmentText">水分摂取により前倒し中</span>
+                  </span>
+                </div>
+
+                <!-- 視覚的タイムラインバー（前回排尿 → 現在 → 予測レンジ） -->
+                <div class="mt-2.5">
+                  <div class="relative h-2.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200/70">
+                    <!-- 予測時間帯ゾーン（レンジ帯） -->
+                    <div id="timelineRangeZone" class="absolute top-0 bottom-0 bg-amber-300/70 border-x border-amber-500/60 transition-all duration-500" style="left: 72%; width: 28%;"></div>
+                    <!-- 現在進行バー -->
+                    <div id="timelineProgressFill" class="absolute top-0 bottom-0 left-0 bg-teal-500/85 rounded-l-full transition-all duration-700" style="width: 0%;"></div>
+                  </div>
+                  <div class="flex items-center justify-between text-[10px] font-num text-slate-400 mt-1">
+                    <span id="timelineLastLabel">前回 --:--</span>
+                    <span class="text-amber-700 font-sans font-bold">予測レンジ帯</span>
+                    <span id="timelineEndLabel">--:--</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -188,7 +257,7 @@
               </svg>
               <span class="text-lg font-bold">排尿 (おしっこ)</span>
             </div>
-            <span class="text-xs text-teal-100 mt-1">タップして量を選択・記録</span>
+            <span class="text-xs text-teal-100 mt-1">タップして量を選択・タンクをリセット</span>
           </button>
         </div>
 
@@ -199,7 +268,7 @@
               <svg class="w-4 h-4 text-sky-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23-.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0112 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5" />
               </svg>
-              水分摂取 (予測に反映)
+              水分摂取 (タンク量＆予測レンジに連動)
             </span>
           </div>
           <div class="grid grid-cols-3 gap-2">
@@ -425,8 +494,8 @@
 
         <div class="flex items-center justify-between bg-slate-50 p-3.5 rounded-2xl border border-slate-200/70">
           <div class="pr-3">
-            <span class="text-xs font-bold text-slate-800 block">水分摂取による予測前倒し</span>
-            <span class="text-[11px] text-slate-500">水分記録後、摂取量に応じて次回予測を15〜30分早めます。</span>
+            <span class="text-xs font-bold text-slate-800 block">水分摂取によるタンク・予測レンジ連動</span>
+            <span class="text-[11px] text-slate-500">水分記録後、タンクのチャージ率が増え、予測時間帯が手前へスライドします。</span>
           </div>
           <input type="checkbox" id="fluidAdjustToggle" checked class="w-5 h-5 accent-teal-600 rounded cursor-pointer" />
         </div>
@@ -471,7 +540,7 @@
   <!-- ========================================== -->
   <script>
     /**
-     * ケア排尿ノート - 状態管理および予測アルゴリズム
+     * ケア排尿ノート - 膀胱タンクゲージ＆予測時間帯レンジモデル
      */
     const STORAGE_KEY = 'care_urination_logs_v2';
     const SETTINGS_KEY = 'care_urination_settings_v2';
@@ -486,7 +555,7 @@
     };
     let confirmCallback = null;
 
-    // 初期化処理（イベント登録を最優先で行い、ボタン無反応を防ぐ）
+    // 初期化処理
     document.addEventListener('DOMContentLoaded', () => {
       try {
         setupEventListeners();
@@ -498,7 +567,7 @@
       updateHeaderDate();
       renderAll();
 
-      // 15秒ごとにカウントダウンと予測表示をリアルタイム更新
+      // 15秒ごとにタンクチャージ率と予測レンジ表示をリアルタイム更新
       setInterval(() => {
         updateHeaderDate();
         renderPredictionCard();
@@ -539,7 +608,7 @@
       }
     }
 
-    // ログの読み込み（古い形式のデータを安全に除外して読み込み）
+    // ログの読み込み
     function loadLogs() {
       try {
         const saved = localStorage.getItem(STORAGE_KEY);
@@ -590,7 +659,7 @@
         {
           id: 'sample-2',
           type: 'urination',
-          timestamp: minsAgo(95),
+          timestamp: minsAgo(110), // 1時間50分前
           detail: '普通',
           fluidAmount: 0,
           note: 'トイレ誘導にて排尿'
@@ -598,7 +667,7 @@
         {
           id: 'sample-4',
           type: 'urination',
-          timestamp: minsAgo(245),
+          timestamp: minsAgo(265), // 前回との間隔 = 2時間35分
           detail: '多め',
           fluidAmount: 0,
           note: '起床後トイレ'
@@ -606,7 +675,7 @@
         {
           id: 'sample-5',
           type: 'fluid',
-          timestamp: minsAgo(310),
+          timestamp: minsAgo(320),
           detail: '200ml',
           fluidAmount: 200,
           note: '白湯'
@@ -614,7 +683,7 @@
         {
           id: 'sample-6',
           type: 'urination',
-          timestamp: minsAgo(415),
+          timestamp: minsAgo(435), // 前回との間隔 = 2時間50分
           detail: '普通',
           fluidAmount: 0,
           note: '起床時排尿'
@@ -651,14 +720,14 @@
       renderAll();
 
       const labelMap = {
-        urination: `排尿（${detail}）を記録しました`,
+        urination: `排尿（${detail}）を記録し、タンクをリセットしました`,
         fluid: `水分摂取（${detail}）を記録しました`
       };
       showToast(labelMap[type] || '記録しました');
     }
 
     // ==========================================
-    // 排尿予測アルゴリズム
+    // 膀胱タンクチャージ率＆予測時間帯レンジ算出
     // ==========================================
     function calculatePrediction() {
       const urinations = logs
@@ -678,6 +747,7 @@
 
       const lastUrination = urinations[urinations.length - 1];
       const lastUrinationDate = new Date(lastUrination.timestamp);
+      const now = new Date();
 
       // 有効な排尿間隔（20分以上〜10時間以下）を抽出
       const validIntervals = [];
@@ -688,7 +758,7 @@
         }
       }
 
-      // 平均間隔を算出（連続タップ等で有効間隔が取れなかった場合は基本間隔にフォールバック）
+      // 1. ベース平均間隔を算出
       let avgIntervalMins = settings.defaultIntervalMins;
       let basisText = `基本間隔(${formatDuration(settings.defaultIntervalMins)})から算出`;
 
@@ -699,42 +769,68 @@
         basisText = `直近${recentIntervals.length}区間の平均から算出`;
       }
 
-      // 夜間モード補正（21:00〜翌6:00の間は間隔を1.25倍に調整）
+      // 2. 夜間モード補正（21:00〜翌6:00の間は間隔を1.25倍に調整）
       let effectiveIntervalMins = avgIntervalMins;
-      const currentHour = new Date().getHours();
+      const currentHour = now.getHours();
       const isNight = currentHour >= 21 || currentHour < 6;
       if (settings.nightMode && isNight) {
         effectiveIntervalMins = Math.round(effectiveIntervalMins * 1.25);
         basisText += '・夜間補正中';
       }
 
-      // 前回排尿以降の水分摂取量に応じた前倒し補正
+      // 3. 前回排尿以降の水分摂取量に応じた前倒し＆チャージ増加補正
       let fluidReducedMins = 0;
+      let totalFluidSinceLast = 0;
       if (settings.fluidAdjust) {
         const fluidsSinceLast = logs.filter(item =>
           item.type === 'fluid' && new Date(item.timestamp) > lastUrinationDate
         );
-        const totalFluidSinceLast = fluidsSinceLast.reduce((sum, f) => sum + (Number(f.fluidAmount) || 0), 0);
+        totalFluidSinceLast = fluidsSinceLast.reduce((sum, f) => sum + (Number(f.fluidAmount) || 0), 0);
 
-        if (totalFluidSinceLast >= 100) {
-          fluidReducedMins = Math.min(35, Math.round((totalFluidSinceLast / 100) * 10));
-          effectiveIntervalMins = Math.max(45, effectiveIntervalMins - fluidReducedMins);
+        if (totalFluidSinceLast > 0) {
+          // 100mlあたり約12分前倒し（最大45分まで）
+          fluidReducedMins = Math.min(45, Math.round((totalFluidSinceLast / 100) * 12));
+          effectiveIntervalMins = Math.max(40, effectiveIntervalMins - fluidReducedMins);
         }
       }
 
-      const predictedDate = new Date(lastUrinationDate.getTime() + effectiveIntervalMins * 60000);
+      // 4. 膀胱タンクの推定チャージ率（0%〜100%）の計算
+      // 経過時間割合 + 水分摂取による即時チャージ加算（100mlあたり約5%加算）
+      const elapsedMins = Math.max(0, (now - lastUrinationDate) / 60000);
+      const timeChargeRatio = elapsedMins / effectiveIntervalMins;
+      const fluidInstantBonus = settings.fluidAdjust ? (totalFluidSinceLast / 100) * 0.04 : 0;
+      const rawPercent = Math.round((timeChargeRatio + fluidInstantBonus) * 100);
+      const chargePercent = Math.min(100, Math.max(0, rawPercent));
+
+      // 5. 予測時間帯レンジの算出（中心時刻の前後 ±20〜25分、約45分幅）
+      const centerPredictedDate = new Date(lastUrinationDate.getTime() + effectiveIntervalMins * 60000);
+      const halfSpreadMins = Math.min(25, Math.max(15, Math.round(effectiveIntervalMins * 0.14)));
+
+      const rangeStartDate = new Date(centerPredictedDate.getTime() - halfSpreadMins * 60000);
+      const rangeEndDate = new Date(centerPredictedDate.getTime() + halfSpreadMins * 60000);
+
+      // タイムラインバー用の進捗率（前回排尿 〜 予測レンジ終了までを100%とした場合の現在地）
+      const totalSpanMins = Math.max(1, (rangeEndDate - lastUrinationDate) / 60000);
+      const rangeStartRatio = Math.min(95, Math.max(10, Math.round(((rangeStartDate - lastUrinationDate) / 60000 / totalSpanMins) * 100)));
+      const currentProgressRatio = Math.min(100, Math.max(0, Math.round((elapsedMins / totalSpanMins) * 100)));
 
       return {
         isReady: true,
-        predictedDate,
+        chargePercent,
+        centerPredictedDate,
+        rangeStartDate,
+        rangeEndDate,
         avgIntervalMins,
         lastUrinationDate,
         fluidReducedMins,
+        totalFluidSinceLast,
+        rangeStartRatio,
+        currentProgressRatio,
         basisText
       };
     }
 
-    // 予測カードのUI描画
+    // 予測カード（膀胱タンクゲージ＆予測時間帯レンジ）のUI描画
     function renderPredictionCard() {
       const pred = calculatePrediction();
       const now = new Date();
@@ -765,46 +861,115 @@
         return;
       }
 
+      // データ充足時：タンクゲージ＆予測レンジを描画
       collectingView.classList.add('hidden');
       resultView.classList.remove('hidden');
-      pulseDot.className = 'w-2 h-2 rounded-full bg-teal-500 animate-pulse';
 
-      const timeStr = formatTime(pred.predictedDate);
-      document.getElementById('predictedTimeText').textContent = timeStr;
-      document.getElementById('avgIntervalText').textContent = `約 ${formatDuration(pred.avgIntervalMins)}`;
-      document.getElementById('predictionBasisText').textContent = pred.basisText;
+      const pct = pred.chargePercent;
 
-      document.getElementById('lastUrinationInfo').textContent =
-        `前回排尿: ${formatTime(pred.lastUrinationDate)}（${getRelativePastText(pred.lastUrinationDate)}）`;
+      // 1. 膀胱タンクゲージの高さ＆色分け（70%未満：青・緑系 / 70〜89%：黄・オレンジ / 90%以上：赤）
+      const tankShell = document.getElementById('bladderTankShell');
+      const tankLiquid = document.getElementById('bladderTankLiquid');
+      const tankWave = document.getElementById('bladderTankWave');
+      const pctText = document.getElementById('bladderPercentText');
+      const pctUnit = document.getElementById('bladderPercentUnit');
+      const tankCaption = document.getElementById('tankStatusCaption');
+      const countdownEl = document.getElementById('countdownText');
 
+      tankLiquid.style.height = `${pct}%`;
+      pctText.textContent = pct;
+
+      if (pct >= 90) {
+        // 90%以上：警告色（赤）
+        tankShell.className = 'relative w-20 h-28 rounded-2xl border-2 border-rose-300 bg-rose-50/40 overflow-hidden shadow-inner flex items-center justify-center';
+        tankLiquid.className = 'tank-liquid absolute bottom-0 inset-x-0 bg-rose-500';
+        tankWave.setAttribute('class', 'tank-wave absolute -top-2.5 left-0 h-3 text-rose-500 transition-colors duration-500');
+        pctText.className = 'font-num text-xl font-extrabold text-rose-600 leading-tight';
+        pctUnit.className = 'font-num text-[11px] font-bold text-rose-600 ml-0.5';
+        tankCaption.textContent = '警告・トイレ推奨';
+        tankCaption.className = 'text-[10px] font-bold text-rose-600 mt-1.5';
+
+        badgeEl.textContent = 'トイレ誘導推奨';
+        badgeEl.className = 'text-xs font-bold px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-300';
+        pulseDot.className = 'w-2 h-2 rounded-full bg-rose-500 animate-ping';
+        countdownEl.className = 'font-num text-sm font-bold text-rose-600 mt-0.5';
+      } else if (pct >= 70) {
+        // 70%〜89%：注意色（黄色・オレンジ）
+        tankShell.className = 'relative w-20 h-28 rounded-2xl border-2 border-amber-300 bg-amber-50/40 overflow-hidden shadow-inner flex items-center justify-center';
+        tankLiquid.className = 'tank-liquid absolute bottom-0 inset-x-0 bg-amber-400';
+        tankWave.setAttribute('class', 'tank-wave absolute -top-2.5 left-0 h-3 text-amber-400 transition-colors duration-500');
+        pctText.className = 'font-num text-xl font-extrabold text-amber-600 leading-tight';
+        pctUnit.className = 'font-num text-[11px] font-bold text-amber-600 ml-0.5';
+        tankCaption.textContent = '注意・そろそろ';
+        tankCaption.className = 'text-[10px] font-bold text-amber-600 mt-1.5';
+
+        badgeEl.textContent = 'そろそろ目安';
+        badgeEl.className = 'text-xs font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-300';
+        pulseDot.className = 'w-2 h-2 rounded-full bg-amber-500 animate-pulse';
+        countdownEl.className = 'font-num text-sm font-bold text-amber-600 mt-0.5';
+      } else {
+        // 70%未満：落ち着いた色（青・緑系）
+        tankShell.className = 'relative w-20 h-28 rounded-2xl border-2 border-teal-200 bg-teal-50/30 overflow-hidden shadow-inner flex items-center justify-center';
+        tankLiquid.className = 'tank-liquid absolute bottom-0 inset-x-0 bg-teal-500';
+        tankWave.setAttribute('class', 'tank-wave absolute -top-2.5 left-0 h-3 text-teal-500 transition-colors duration-500');
+        pctText.className = 'font-num text-xl font-extrabold text-teal-700 leading-tight';
+        pctUnit.className = 'font-num text-[11px] font-bold text-teal-700 ml-0.5';
+        tankCaption.textContent = '余裕あり';
+        tankCaption.className = 'text-[10px] font-bold text-teal-700 mt-1.5';
+
+        badgeEl.textContent = '余裕あり';
+        badgeEl.className = 'text-xs font-bold px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200';
+        pulseDot.className = 'w-2 h-2 rounded-full bg-teal-500 animate-pulse';
+        countdownEl.className = 'font-num text-sm font-bold text-teal-700 mt-0.5';
+      }
+
+      // 2. 予測時間帯レンジの描画（例：14:15 〜 15:00）
+      document.getElementById('predictedRangeStart').textContent = formatTime(pred.rangeStartDate);
+      document.getElementById('predictedRangeEnd').textContent = formatTime(pred.rangeEndDate);
+
+      // カウントダウン文言
+      const minsToStart = Math.round((pred.rangeStartDate - now) / 60000);
+      const minsToEnd = Math.round((pred.rangeEndDate - now) / 60000);
+
+      if (minsToStart > 0) {
+        countdownEl.textContent = `目安時間帯まで あと ${formatDuration(minsToStart)}`;
+      } else if (minsToEnd >= 0) {
+        countdownEl.textContent = `ただいま予測時間帯の中です`;
+      } else {
+        countdownEl.textContent = `予測時間帯を ${formatDuration(Math.abs(minsToEnd))} 経過`;
+      }
+
+      // 水分摂取によるスライド連動バッジ
       const fluidBadge = document.getElementById('fluidAdjustmentBadge');
+      const fluidText = document.getElementById('fluidAdjustmentText');
       if (pred.fluidReducedMins > 0) {
-        fluidBadge.textContent = `水分摂取により約${pred.fluidReducedMins}分前倒し`;
+        fluidText.textContent = `水分${pred.totalFluidSinceLast}ml摂取で${pred.fluidReducedMins}分前倒し中`;
         fluidBadge.classList.remove('hidden');
       } else {
         fluidBadge.classList.add('hidden');
       }
 
-      const diffMins = Math.round((pred.predictedDate - now) / 60000);
-      const countdownEl = document.getElementById('countdownText');
+      // タイムラインバーの更新
+      const rangeZone = document.getElementById('timelineRangeZone');
+      const progressFill = document.getElementById('timelineProgressFill');
+      rangeZone.style.left = `${pred.rangeStartRatio}%`;
+      rangeZone.style.width = `${100 - pred.rangeStartRatio}%`;
+      progressFill.style.width = `${pred.currentProgressRatio}%`;
 
-      if (diffMins > 20) {
-        badgeEl.textContent = '余裕あり';
-        badgeEl.className = 'text-xs font-bold px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200';
-        countdownEl.textContent = `あと ${formatDuration(diffMins)}`;
-        countdownEl.className = 'font-num text-xl font-bold text-teal-700';
-      } else if (diffMins >= 0) {
-        badgeEl.textContent = 'そろそろ目安';
-        badgeEl.className = 'text-xs font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-300';
-        countdownEl.textContent = diffMins === 0 ? 'まもなく予測時刻' : `あと ${diffMins}分`;
-        countdownEl.className = 'font-num text-xl font-bold text-amber-600';
+      if (pct >= 90) {
+        progressFill.className = 'absolute top-0 bottom-0 left-0 bg-rose-500/85 rounded-l-full transition-all duration-700';
+      } else if (pct >= 70) {
+        progressFill.className = 'absolute top-0 bottom-0 left-0 bg-amber-500/85 rounded-l-full transition-all duration-700';
       } else {
-        const overdueMins = Math.abs(diffMins);
-        badgeEl.textContent = '予測時刻を超過';
-        badgeEl.className = 'text-xs font-bold px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-300';
-        countdownEl.textContent = `${formatDuration(overdueMins)} 経過`;
-        countdownEl.className = 'font-num text-xl font-bold text-rose-600';
+        progressFill.className = 'absolute top-0 bottom-0 left-0 bg-teal-500/85 rounded-l-full transition-all duration-700';
       }
+
+      document.getElementById('timelineLastLabel').textContent = `前回 ${formatTime(pred.lastUrinationDate)}`;
+      document.getElementById('timelineEndLabel').textContent = formatTime(pred.rangeEndDate);
+
+      // 下部バー情報
+      document.getElementById('avgIntervalText').textContent = `約 ${formatDuration(pred.avgIntervalMins)}`;
+      document.getElementById('predictionBasisText').textContent = pred.basisText;
     }
 
     // 全体の再描画
@@ -1102,12 +1267,10 @@
       showToast('排尿日誌CSVをダウンロードしました');
     }
 
-    // イベントリスナー登録（すべてaddEventListenerで一元管理）
+    // イベントリスナー登録
     function setupEventListeners() {
-      // 排尿ボタン → 量選択ポップアップを開く
       document.getElementById('openUrinationModalBtn').addEventListener('click', openUrinationAmountModal);
 
-      // 排尿量選択ポップアップ内の各ボタン
       document.querySelectorAll('.urination-amount-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           const amount = btn.getAttribute('data-amount');
@@ -1115,14 +1278,12 @@
         });
       });
 
-      // 排尿量選択ポップアップを閉じる
       document.getElementById('closeUrinationModalXBtn').addEventListener('click', closeUrinationAmountModal);
       document.getElementById('closeUrinationModalCancelBtn').addEventListener('click', closeUrinationAmountModal);
       document.getElementById('urinationAmountModal').addEventListener('click', (e) => {
         if (e.target.id === 'urinationAmountModal') closeUrinationAmountModal();
       });
 
-      // 水分摂取クイックボタン
       document.querySelectorAll('.fluid-quick-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           const ml = parseInt(btn.getAttribute('data-fluid'), 10);
@@ -1130,7 +1291,6 @@
         });
       });
 
-      // 時間指定記録モーダル
       document.getElementById('openCustomModalBtn').addEventListener('click', openCustomModal);
       document.getElementById('closeEntryModalXBtn').addEventListener('click', closeEntryModal);
       document.getElementById('closeEntryModalCancelBtn').addEventListener('click', closeEntryModal);
@@ -1173,7 +1333,6 @@
         closeEntryModal();
       });
 
-      // タイムライン内の編集・削除ボタン（イベント委譲）
       document.getElementById('timelineContainer').addEventListener('click', (e) => {
         const editBtn = e.target.closest('.edit-entry-btn');
         if (editBtn) {
@@ -1186,7 +1345,6 @@
         }
       });
 
-      // 設定モーダル
       document.getElementById('openSettingsBtn').addEventListener('click', () => {
         document.getElementById('settingsModal').classList.remove('hidden');
       });
@@ -1203,7 +1361,6 @@
         showToast('予測設定を保存しました');
       });
 
-      // 確認モーダルボタン
       document.getElementById('confirmCancelBtn').addEventListener('click', closeConfirmModal);
       document.getElementById('confirmOkBtn').addEventListener('click', () => {
         if (typeof confirmCallback === 'function') {
@@ -1212,10 +1369,8 @@
         closeConfirmModal();
       });
 
-      // CSV出力
       document.getElementById('exportCsvBtn').addEventListener('click', exportToCsv);
 
-      // サンプルデータ読込
       document.getElementById('loadSampleBtn').addEventListener('click', () => {
         openConfirmModal(
           'サンプルデータの読込',
@@ -1229,7 +1384,6 @@
         );
       });
 
-      // データ全消去
       document.getElementById('clearAllBtn').addEventListener('click', () => {
         openConfirmModal(
           'データの全消去',
@@ -1260,12 +1414,6 @@
       if (h === 0) return `${m}分`;
       if (m === 0) return `${h}時間`;
       return `${h}時間${String(m).padStart(2, '0')}分`;
-    }
-
-    function getRelativePastText(pastDate) {
-      const diffMins = Math.max(0, Math.round((new Date() - pastDate) / 60000));
-      if (diffMins < 1) return 'たった今';
-      return `${formatDuration(diffMins)}前`;
     }
 
     function getDateKey(date) {

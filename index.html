@@ -102,7 +102,7 @@
         <div class="bg-white rounded-2xl shadow-md border border-slate-100 p-5">
           <div class="flex items-center justify-between mb-2">
             <span class="text-xs font-bold text-slate-500 flex items-center gap-1.5">
-              <span class="w-2 h-2 rounded-full bg-teal-500 animate-pulse"></span>
+              <span id="predictionPulseDot" class="w-2 h-2 rounded-full bg-teal-500 animate-pulse"></span>
               次回の排尿予測タイミング
             </span>
             <!-- ステータスバッジ -->
@@ -111,8 +111,30 @@
             </span>
           </div>
 
-          <!-- メイン予測時刻＆カウントダウン -->
-          <div class="flex items-baseline justify-between my-2">
+          <!-- A. データ収集中（3回未満）の表示エリア -->
+          <div id="collectingDataView" class="hidden my-2 py-3 px-4 rounded-xl bg-teal-50/70 border border-teal-100 text-center">
+            <p class="text-base font-bold text-teal-900">
+              あと<span id="remainingCountText" class="font-num text-2xl text-teal-700 mx-1">3</span>回記録してください。
+            </p>
+            <p class="text-xs text-slate-600 mt-1">
+              個人の排尿リズムを学習してから予測時刻を表示します
+            </p>
+            <!-- 進捗ステップバー -->
+            <div class="mt-3 max-w-[220px] mx-auto">
+              <div class="flex justify-between text-[11px] font-bold text-teal-800 mb-1">
+                <span>学習進捗</span>
+                <span id="progressCountLabel" class="font-num">0 / 3回</span>
+              </div>
+              <div class="grid grid-cols-3 gap-1.5">
+                <div id="stepBar1" class="h-2 rounded-full bg-slate-200 transition-colors"></div>
+                <div id="stepBar2" class="h-2 rounded-full bg-slate-200 transition-colors"></div>
+                <div id="stepBar3" class="h-2 rounded-full bg-slate-200 transition-colors"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- B. 予測完了後（3回以上）のメイン予測時刻＆カウントダウン -->
+          <div id="predictionResultView" class="flex items-baseline justify-between my-2">
             <div>
               <div class="flex items-baseline gap-1">
                 <span id="predictedTimeText" class="font-num text-4xl font-bold text-slate-900 tracking-tight">--:--</span>
@@ -135,9 +157,9 @@
               <svg class="w-4 h-4 text-teal-600 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span>平均間隔: <strong id="avgIntervalText" class="text-slate-800 font-num">約 3時間00分</strong></span>
+              <span>平均間隔: <strong id="avgIntervalText" class="text-slate-800 font-num">データ収集中</strong></span>
             </div>
-            <span id="predictionBasisText" class="text-[11px] text-slate-400">直近の記録から算出</span>
+            <span id="predictionBasisText" class="text-[11px] text-slate-400">3回の排尿記録で自動算出</span>
           </div>
         </div>
       </section>
@@ -393,18 +415,9 @@
       </div>
 
       <form id="settingsForm" class="mt-4 space-y-4">
-        <div>
-          <label for="defaultIntervalInput" class="block text-xs font-bold text-slate-700 mb-1">
-            基本の排尿間隔（データが少ない時の基準値）
-          </label>
-          <p class="text-[11px] text-slate-500 mb-2">排尿記録が2件未満の場合にこの間隔で予測します。</p>
-          <select id="defaultIntervalInput" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 bg-white">
-            <option value="120">2時間 00分</option>
-            <option value="150">2時間 30分</option>
-            <option value="180" selected>3時間 00分（標準）</option>
-            <option value="210">3時間 30分</option>
-            <option value="240">4時間 00分</option>
-          </select>
+        <div class="bg-teal-50/70 p-3.5 rounded-2xl border border-teal-100">
+          <span class="text-xs font-bold text-teal-900 block">学習データ収集ルール</span>
+          <span class="text-[11px] text-teal-800 mt-0.5 block">排尿を3回記録（2区間分の間隔を取得）するまで予測時刻は非表示となり、記録ガイドが表示されます。</span>
         </div>
 
         <div class="flex items-center justify-between bg-slate-50 p-3.5 rounded-2xl border border-slate-200/70">
@@ -418,7 +431,7 @@
         <div class="flex items-center justify-between bg-slate-50 p-3.5 rounded-2xl border border-slate-200/70">
           <div class="pr-3">
             <span class="text-xs font-bold text-slate-800 block">水分摂取による予測前倒し</span>
-            <span class="text-[11px] text-slate-500">水分記録後、摂取量に応じて次回予測を15〜30分早めます。</span>
+            <span class="text-[11px] text-slate-500">水分記録後、摂取量に応じて次回予測を15〜35分早めます。</span>
           </div>
           <input type="checkbox" id="fluidAdjustToggle" checked class="w-5 h-5 accent-teal-600 rounded cursor-pointer" />
         </div>
@@ -467,11 +480,11 @@
      */
     const STORAGE_KEY = 'care_urination_logs_v1';
     const SETTINGS_KEY = 'care_urination_settings_v1';
+    const REQUIRED_URINATION_LOGS = 3; // 予測表示に必要な排尿回数（2区間分の間隔）
 
     // アプリケーション状態
     let logs = [];
     let settings = {
-      defaultIntervalMins: 180, // デフォルト3時間
       nightMode: true,
       fluidAdjust: true
     };
@@ -513,7 +526,6 @@
       } catch (e) {
         console.error('設定の読み込みに失敗:', e);
       }
-      document.getElementById('defaultIntervalInput').value = settings.defaultIntervalMins;
       document.getElementById('nightModeToggle').checked = settings.nightMode;
       document.getElementById('fluidAdjustToggle').checked = settings.fluidAdjust;
     }
@@ -526,15 +538,14 @@
       }
     }
 
-    // ログの読み込み（初回空の場合はリアルなサンプルデータを自動生成）
+    // ログの読み込み（初回は空配列からスタートし、3回記録の学習フローから体験できるようにする）
     function loadLogs() {
       try {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
           logs = JSON.parse(saved);
         } else {
-          logs = createSampleLogs();
-          saveLogs();
+          logs = [];
         }
       } catch (e) {
         console.error('記録の読み込みに失敗:', e);
@@ -553,7 +564,7 @@
       }
     }
 
-    // サンプルデータ生成（現在時刻を基準に今日の自然なケア記録を生成）
+    // サンプルデータ生成（3回の排尿記録を含むテスト用データ）
     function createSampleLogs() {
       const now = new Date();
       const minsAgo = (m) => new Date(now.getTime() - m * 60000).toISOString();
@@ -642,39 +653,37 @@
         .filter(item => item.type === 'urination')
         .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
-      if (urinations.length === 0) {
+      // 有効な排尿間隔（20分〜10時間）を抽出
+      const validIntervals = [];
+      for (let i = 1; i < urinations.length; i++) {
+        const diffMins = (new Date(urinations[i].timestamp) - new Date(urinations[i - 1].timestamp)) / 60000;
+        if (diffMins >= 20 && diffMins <= 600) {
+          validIntervals.push(diffMins);
+        }
+      }
+
+      // 必要な間隔数（3回記録 = 2区間）に満たない場合は予測を出さない
+      const requiredIntervals = REQUIRED_URINATION_LOGS - 1; // 2区間
+      if (validIntervals.length < requiredIntervals) {
+        // すでに1回以上記録がある場合は「有効間隔数 + 1」を現在の進捗回数として扱う（短時間連打の除外に対応）
+        const effectiveCount = urinations.length === 0 ? 0 : validIntervals.length + 1;
+        const remainingCount = Math.max(1, REQUIRED_URINATION_LOGS - effectiveCount);
+
         return {
-          hasData: false,
-          predictedDate: new Date(Date.now() + settings.defaultIntervalMins * 60000),
-          avgIntervalMins: settings.defaultIntervalMins,
-          lastUrinationDate: null,
-          fluidReducedMins: 0,
-          basisText: '初期基準値から算出'
+          isReady: false,
+          effectiveCount,
+          remainingCount
         };
       }
 
       const lastUrination = urinations[urinations.length - 1];
       const lastUrinationDate = new Date(lastUrination.timestamp);
 
-      // 1. 直近の排尿間隔（最大直近5区間）から平均間隔を算出
-      // 極端に短い(20分未満)または長い(10時間超)異常値は重みを抑える
-      const intervals = [];
-      for (let i = 1; i < urinations.length; i++) {
-        const diffMins = (new Date(urinations[i].timestamp) - new Date(urinations[i - 1].timestamp)) / 60000;
-        if (diffMins >= 20 && diffMins <= 600) {
-          intervals.push(diffMins);
-        }
-      }
-
-      let avgIntervalMins = settings.defaultIntervalMins;
-      let basisText = `基準値(${formatDuration(settings.defaultIntervalMins)})を使用`;
-
-      if (intervals.length > 0) {
-        const recentIntervals = intervals.slice(-5); // 直近5回分
-        const sum = recentIntervals.reduce((acc, v) => acc + v, 0);
-        avgIntervalMins = Math.round(sum / recentIntervals.length);
-        basisText = `直近${recentIntervals.length}回の平均から算出`;
-      }
+      // 1. 直近の有効な排尿間隔（最大直近5区間）から平均間隔を算出
+      const recentIntervals = validIntervals.slice(-5);
+      const sum = recentIntervals.reduce((acc, v) => acc + v, 0);
+      const avgIntervalMins = Math.round(sum / recentIntervals.length);
+      let basisText = `直近${recentIntervals.length}区間の平均から算出`;
 
       // 2. 夜間モード補正（21:00〜翌6:00の間は間隔を1.25倍に調整）
       let effectiveIntervalMins = avgIntervalMins;
@@ -703,7 +712,7 @@
       const predictedDate = new Date(lastUrinationDate.getTime() + effectiveIntervalMins * 60000);
 
       return {
-        hasData: true,
+        isReady: true,
         predictedDate,
         avgIntervalMins,
         lastUrinationDate,
@@ -715,19 +724,50 @@
     // 予測カードのUI描画
     function renderPredictionCard() {
       const pred = calculatePrediction();
-      const now = new Date();
+      const collectingView = document.getElementById('collectingDataView');
+      const resultView = document.getElementById('predictionResultView');
+      const badgeEl = document.getElementById('predictionBadge');
+      const pulseDot = document.getElementById('predictionPulseDot');
 
+      // --- パターンA: データ収集不足（3回未満） ---
+      if (!pred.isReady) {
+        collectingView.classList.remove('hidden');
+        resultView.classList.add('hidden');
+
+        badgeEl.textContent = 'データ収集中';
+        badgeEl.className = 'text-xs font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200';
+        pulseDot.className = 'w-2 h-2 rounded-full bg-amber-400 animate-pulse';
+
+        document.getElementById('remainingCountText').textContent = pred.remainingCount;
+        document.getElementById('progressCountLabel').textContent = `${pred.effectiveCount} / ${REQUIRED_URINATION_LOGS}回`;
+
+        // 3段階の進捗バーの色を更新
+        for (let i = 1; i <= REQUIRED_URINATION_LOGS; i++) {
+          const bar = document.getElementById(`stepBar${i}`);
+          if (i <= pred.effectiveCount) {
+            bar.className = 'h-2 rounded-full bg-teal-500 transition-colors';
+          } else {
+            bar.className = 'h-2 rounded-full bg-slate-200 transition-colors';
+          }
+        }
+
+        document.getElementById('avgIntervalText').textContent = 'データ収集中';
+        document.getElementById('predictionBasisText').textContent = `あと${pred.remainingCount}回の排尿記録で予測開始`;
+        return;
+      }
+
+      // --- パターンB: 3回以上の排尿データが揃い予測を表示 ---
+      collectingView.classList.add('hidden');
+      resultView.classList.remove('hidden');
+      pulseDot.className = 'w-2 h-2 rounded-full bg-teal-500 animate-pulse';
+
+      const now = new Date();
       const timeStr = formatTime(pred.predictedDate);
       document.getElementById('predictedTimeText').textContent = timeStr;
       document.getElementById('avgIntervalText').textContent = `約 ${formatDuration(pred.avgIntervalMins)}`;
       document.getElementById('predictionBasisText').textContent = pred.basisText;
-
-      if (pred.lastUrinationDate) {
-        document.getElementById('lastUrinationInfo').textContent =
-          `前回排尿: ${formatTime(pred.lastUrinationDate)}（${getRelativePastText(pred.lastUrinationDate)}）`;
-      } else {
-        document.getElementById('lastUrinationInfo').textContent = '前回の排尿記録がありません';
-      }
+      document.getElementById('lastUrinationInfo').textContent =
+        `前回排尿: ${formatTime(pred.lastUrinationDate)}（${getRelativePastText(pred.lastUrinationDate)}）`;
 
       // 水分前倒しバッジ
       const fluidBadge = document.getElementById('fluidAdjustmentBadge');
@@ -740,7 +780,6 @@
 
       // カウントダウン＆ステータスバッジの色分け
       const diffMins = Math.round((pred.predictedDate - now) / 60000);
-      const badgeEl = document.getElementById('predictionBadge');
       const countdownEl = document.getElementById('countdownText');
 
       if (diffMins > 20) {
@@ -792,7 +831,7 @@
         container.innerHTML = `
           <div class="bg-white rounded-2xl p-8 text-center border border-slate-100 shadow-xs">
             <p class="text-sm font-bold text-slate-600">まだ記録がありません</p>
-            <p class="text-xs text-slate-400 mt-1">上のボタンから排尿や水分摂取を記録してください。</p>
+            <p class="text-xs text-slate-400 mt-1">上のボタンから排尿を3回記録すると予測が表示されます。</p>
           </div>
         `;
         return;
@@ -1135,7 +1174,6 @@
 
       document.getElementById('settingsForm').addEventListener('submit', (e) => {
         e.preventDefault();
-        settings.defaultIntervalMins = parseInt(document.getElementById('defaultIntervalInput').value, 10) || 180;
         settings.nightMode = document.getElementById('nightModeToggle').checked;
         settings.fluidAdjust = document.getElementById('fluidAdjustToggle').checked;
         saveSettings();
@@ -1160,7 +1198,7 @@
       document.getElementById('loadSampleBtn').addEventListener('click', () => {
         openConfirmModal(
           'サンプルデータの読込',
-          '現在の記録をサンプルデータに置き換えますか？',
+          '現在の記録をサンプルデータ（排尿3回分を含む）に置き換えますか？',
           () => {
             logs = createSampleLogs();
             saveLogs();
